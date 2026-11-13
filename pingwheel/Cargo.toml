@@ -1,0 +1,10 @@
+[package]
+name = "horizon-mod-pingwheel"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Ping Wheel for Horizon: pings compatible with the Fabric Ping Wheel mod."
+
+[lib]
+path = "mixins/pingwheel/runtime.rs"
