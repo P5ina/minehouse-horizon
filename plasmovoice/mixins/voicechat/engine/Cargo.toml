@@ -1,0 +1,16 @@
+[package]
+name = "plasmovoice-engine"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "A Plasmo Voice 2.x protocol client for Horizon: protocol, encryption, Opus and audio"
+publish = false
+
+# Only crates in Horizon's Cargo.lock, by version requirement.
+[dependencies]
+cpal = "0.16"
+ring = "0.17"
+rusty-opus = "1"
+aes = "0.8"
+cbc = "0.1"
+num-bigint = "0.4"
