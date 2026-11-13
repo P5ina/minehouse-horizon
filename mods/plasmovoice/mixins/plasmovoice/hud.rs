@@ -18,6 +18,30 @@ fn voicechat_hud(
             game.native_sprite(batch, "horizon/modimage", src, dst);
         }
     };
+    // The voice distance (`DistanceVisualizeRenderer`): a ring on the
+    // ground at that radius, for two seconds after it changed.
+    if let (Some((radius, argb, at)), Some(cam), Some(me)) = (vc::visualize(), game.native_camera(), game.native_player()) {
+        let centre = at.unwrap_or([me.x, me.y + 0.05, me.z]);
+        let n = 96;
+        let mut prev: Option<[f32; 2]> = None;
+        for i in 0..=n {
+            let a = i as f64 / n as f64 * std::f64::consts::TAU;
+            let p = [centre[0] + a.cos() * f64::from(radius), centre[1], centre[2] + a.sin() * f64::from(radius)];
+            let here = vc::labels::project_matrix(p, cam.position, &cam.view, &cam.projection, (w, h));
+            if let (Some(a), Some(b)) = (prev, here) {
+                let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
+                let len = (dx * dx + dy * dy).sqrt();
+                if len < w {
+                    let steps = (len / 1.5).ceil().max(1.0) as usize;
+                    for k in 0..steps {
+                        let t = k as f32 / steps as f32;
+                        game.native_fill(batch, [a[0] + dx * t - 0.75, a[1] + dy * t - 0.75, 1.5, 1.5], argb);
+                    }
+                }
+            }
+            prev = here;
+        }
+    }
     // Icons above heads, up to 64 blocks away.
     if let Some(cam) = game.native_camera() {
         let offset = vc::icon_offset();

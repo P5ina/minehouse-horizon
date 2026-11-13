@@ -328,6 +328,8 @@ struct Voice {
     menu: ui::Menu,
     /// The input and output devices' names, read when the Devices tab asks.
     device_lists: (Vec<String>, Vec<String>),
+    /// A voice distance shown until then (`DistanceVisualizeRenderer`): radius, ARGB, centre.
+    visualize: Option<(i32, u32, Option<[f64; 3]>, Instant)>,
 }
 
 fn voice() -> MutexGuard<'static, Voice> {
@@ -346,6 +348,7 @@ fn voice() -> MutexGuard<'static, Voice> {
             redirect: None,
             menu: ui::Menu::default(),
             device_lists: (Vec::new(), Vec::new()),
+            visualize: None,
         })
     });
     VOICE.lock().unwrap_or_else(|e| e.into_inner())
@@ -556,6 +559,9 @@ impl Voice {
                 if let Some(s) = self.session.as_mut() {
                     s.own = Some(player);
                 }
+            }
+            Tcp::Visualize { radius, color, position } => {
+                self.visualize = Some((radius, 0xFF00_0000 | color as u32, position, Instant::now() + Duration::from_secs(2)));
             }
             Tcp::SourceAudioEnd { source, .. } => net::end_source(source, &self.shared, &self.mixer),
             Tcp::ActivationRegister(a) if a.id == pv::activation_id("proximity") => {
@@ -878,6 +884,7 @@ impl Voice {
                         None
                     };
                     if let Some(d) = picked {
+                        self.visualize = Some((d, 0xFF00_FF00, None, Instant::now() + Duration::from_secs(2)));
                         self.settings.distance = Some(d);
                         self.save();
                         self.send_distance();
@@ -1148,6 +1155,18 @@ pub fn player_icon(player: u128) -> Option<&'static str> {
         .and_then(|l| session.config.as_ref()?.lines.iter().find(|x| x.id == l).map(|x| x.icon.clone()))
         .unwrap_or_default();
     Some(icons::name_of(&icon).unwrap_or("speaker"))
+}
+
+/// The voice distance to show now: radius, ARGB colour, and its centre (None: the player).
+pub fn visualize() -> Option<(i32, u32, Option<[f64; 3]>)> {
+    let mut v = voice();
+    match v.visualize {
+        Some((r, c, at, until)) if Instant::now() < until => Some((r, c, at)),
+        _ => {
+            v.visualize = None;
+            None
+        }
+    }
 }
 
 /// Where the activation icon and the overlay go (Overlay tab).

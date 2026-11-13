@@ -446,6 +446,8 @@ pub enum Tcp {
     LineRegister(Line),
     LineUnregister(Uuid),
     ActionBar(String),
+    /// `DistanceVisualizePacket`: show a voice distance, around `position` or the player.
+    Visualize { radius: i32, color: i32, position: Option<[f64; 3]> },
     Other(u8),
 }
 
@@ -509,6 +511,11 @@ pub fn decode_tcp(data: &[u8]) -> R<Tcp> {
         id::LINE_REGISTER => Tcp::LineRegister(read_line(&mut r)?),
         id::LINE_UNREGISTER => Tcp::LineUnregister(r.uuid()?),
         id::ANIMATED_ACTION_BAR => Tcp::ActionBar(r.utf()?),
+        id::DISTANCE_VISUALIZE => Tcp::Visualize {
+            radius: r.i32()?,
+            color: r.i32()?,
+            position: if r.bool()? { Some(r.pos()?) } else { None },
+        },
         other => Tcp::Other(other),
     })
 }
