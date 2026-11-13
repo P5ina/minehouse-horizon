@@ -121,8 +121,12 @@ pub struct Shared {
 }
 
 impl Shared {
+    /// The microphone's last peak in dB; silence (-127) before it has heard anything.
     pub fn level(&self) -> f32 {
-        f32::from_bits(self.mic_level.load(Ordering::Relaxed))
+        match self.mic_level.load(Ordering::Relaxed) {
+            0 => -127.0,
+            bits => f32::from_bits(bits),
+        }
     }
     pub fn set_status(&self, s: Status) {
         *self.status.lock().unwrap() = s;
