@@ -16,7 +16,6 @@ fn voicechat_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
     }
     let bound = [
         (vc::Key::PushToTalk, vc::KEY_PTT, vc::DEFAULT_PTT),
-        (vc::Key::Whisper, vc::KEY_WHISPER, vc::DEFAULT_WHISPER),
         (vc::Key::Mute, vc::KEY_MUTE, vc::DEFAULT_MUTE),
         (vc::Key::Disable, vc::KEY_DISABLE, vc::DEFAULT_DISABLE),
     ];

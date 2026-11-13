@@ -42,14 +42,22 @@ fn voicechat_hud(
         }
     }
     // The activation icon: 16 by 16, centred, 32 pixels above the bottom.
+    let (icon_at, overlay_at) = vc::positions();
     if let Some(icon) = vc::hud_icon() {
-        sprite(game, batch, icon, [(w / 2.0).floor() - 8.0, h - 32.0, 16.0, 16.0]);
+        let [x, y] = icon_at.place([w, h], 16.0, 16.0);
+        sprite(game, batch, icon, [x, y, 16.0, 16.0]);
     }
     // The overlay: who talks now, each with their line's icon.
-    if game.native_corner_shown(Corner::TopLeft) {
+    let corner = match overlay_at {
+        vc::Position::TopRight => Corner::TopRight,
+        vc::Position::BottomLeft => Corner::BottomLeft,
+        vc::Position::BottomRight => Corner::BottomRight,
+        _ => Corner::TopLeft,
+    };
+    if game.native_corner_shown(corner) {
         for (name, icon) in vc::overlay() {
             let tw = game.native_text_width(&name);
-            let (x, y) = corners.place(Corner::TopLeft, tw + 16.0, 12.0);
+            let (x, y) = corners.place(corner, tw + 16.0, 12.0);
             game.native_fill(batch, [x, y, tw + 16.0, 12.0], 0x4000_0000);
             sprite(game, batch, icon, [x + 1.0, y + 1.0, 10.0, 10.0]);
             game.native_text(batch, &name, [x + 13.0, y + 2.0], 0xFF_FFFF, true);

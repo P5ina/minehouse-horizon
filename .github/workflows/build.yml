@@ -91,7 +91,9 @@ jobs:
           args=()
           [ -f stage/.cargo/config.toml ] && args+=(--config stage/.cargo/config.toml)
           [ -f stage/.horizon-mod-api-injections.json ] && export HORIZON_MOD_API_INJECTIONS="$PWD/stage/.horizon-mod-api-injections.json"
-          cargo build "${args[@]}" --manifest-path stage/Cargo.toml --locked --profile release --features horizon-client/mods -p horizon-client --bin horizon-client
+          # The mods feature, while the revision still has it (the launcher's `has_mods_feature`).
+          grep -q '^mods *=' stage/crates/horizon-client/Cargo.toml && args+=(--features horizon-client/mods)
+          cargo build "${args[@]}" --manifest-path stage/Cargo.toml --locked --profile release -p horizon-client --bin horizon-client
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/stage-target
       - name: Package

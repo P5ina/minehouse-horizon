@@ -75,14 +75,47 @@ pub enum Key {
     Disable,
 }
 
+/// Where an icon or the overlay sits (`IconPosition`, `OverlayPosition`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Protocol {
-    Auto,
-    V26,
-    V27,
+pub enum Position {
+    TopLeft,
+    TopCenter,
+    TopRight,
+    BottomLeft,
+    BottomCenter,
+    BottomRight,
 }
 
-/// The settings page and what is stored of it.
+impl Position {
+    pub const ICON: [Position; 6] = [Position::TopLeft, Position::TopCenter, Position::TopRight, Position::BottomLeft, Position::BottomCenter, Position::BottomRight];
+    pub const OVERLAY: [Position; 4] = [Position::TopLeft, Position::TopRight, Position::BottomLeft, Position::BottomRight];
+    pub fn key(self) -> &'static str {
+        ["top_left", "top_center", "top_right", "bottom_left", "bottom_center", "bottom_right"][self as usize]
+    }
+    pub fn label(self) -> &'static str {
+        ["Top left", "Top center", "Top right", "Bottom left", "Bottom center", "Bottom right"][self as usize]
+    }
+    fn parse(s: &str) -> Option<Self> {
+        Self::ICON.into_iter().find(|p| p.key() == s)
+    }
+    /// The top left of a `w` by `h` box here on a `size` screen, as Plasmo's
+    /// icon (16 px in from the edges; bottom centre 32 above the bottom).
+    pub fn place(self, size: [f32; 2], w: f32, h: f32) -> [f32; 2] {
+        let x = match self {
+            Position::TopLeft | Position::BottomLeft => 16.0,
+            Position::TopCenter | Position::BottomCenter => (size[0] / 2.0).floor() - w / 2.0,
+            _ => size[0] - 16.0 - w,
+        };
+        let y = match self {
+            Position::TopLeft | Position::TopCenter | Position::TopRight => 16.0,
+            Position::BottomCenter => size[1] - 32.0,
+            _ => size[1] - 16.0 - h,
+        };
+        [x, y]
+    }
+}
+
+/// The settings screen's values and what is stored of them (Plasmo's `VoiceClientConfig`).
 #[derive(Clone, Debug, PartialEq)]
 pub struct Settings {
     pub mode: Mode,
@@ -91,9 +124,21 @@ pub struct Settings {
     pub volume: u32,
     pub mic_gain: u32,
     pub threshold: i32,
-    pub protocol: Protocol,
-    pub hud: bool,
-    pub group_labels: bool,
+    pub input_device: String,
+    pub output_device: String,
+    pub show_activation_icon: bool,
+    pub icon_position: Position,
+    /// 0 when the HUD shows, 1 always, 2 hidden (`showSourceIcons`).
+    pub source_icons: u8,
+    pub overlay: bool,
+    pub overlay_position: Position,
+    pub panning: bool,
+    /// The proximity distance the player picked, if not the server's default.
+    pub distance: Option<i32>,
+    pub line_volumes: std::collections::BTreeMap<String, u32>,
+    pub line_mutes: std::collections::BTreeSet<String>,
+    pub player_volumes: std::collections::BTreeMap<u128, u32>,
+    pub player_mutes: std::collections::BTreeSet<u128>,
 }
 
 impl Default for Settings {
@@ -105,44 +150,63 @@ impl Default for Settings {
             volume: 100,
             mic_gain: 100,
             threshold: -30,
-            protocol: Protocol::Auto,
-            hud: true,
-            group_labels: true,
+            input_device: String::new(),
+            output_device: String::new(),
+            show_activation_icon: true,
+            icon_position: Position::BottomCenter,
+            source_icons: 0,
+            overlay: true,
+            overlay_position: Position::TopLeft,
+            panning: true,
+            distance: None,
+            line_volumes: Default::default(),
+            line_mutes: Default::default(),
+            player_volumes: Default::default(),
+            player_mutes: Default::default(),
         }
     }
-}
-
-const VOLUMES: [u32; 9] = [0, 25, 50, 75, 100, 125, 150, 175, 200];
-const GAINS: [u32; 8] = [50, 75, 100, 125, 150, 200, 250, 300];
-const THRESHOLDS: [i32; 7] = [-70, -60, -50, -45, -40, -30, -20];
-
-fn next<T: Copy + PartialEq>(list: &[T], v: T) -> T {
-    let i = list.iter().position(|x| *x == v).map_or(0, |i| (i + 1) % list.len());
-    list[i]
 }
 
 impl Settings {
     pub fn load(get: &dyn Fn(&str) -> Option<String>) -> Self {
         let d = Self::default();
         let num = |k: &str| get(k).and_then(|v| v.parse::<i64>().ok());
+        let flag = |k: &str, dv: bool| get(k).map_or(dv, |v| v == "true");
+        let list = |k: &str| get(k).unwrap_or_default();
+        let pairs = |k: &str| -> Vec<(String, u32)> {
+            list(k)
+                .split(',')
+                .filter_map(|p| p.split_once('=').and_then(|(a, b)| Some((a.to_owned(), b.parse().ok()?))))
+                .collect()
+        };
         Self {
             mode: if get("mode").as_deref() == Some("voice") { Mode::Voice } else { Mode::PushToTalk },
-            muted: get("muted").as_deref() == Some("true"),
-            disabled: get("disabled").as_deref() == Some("true"),
+            muted: flag("muted", false),
+            disabled: flag("disabled", false),
             volume: num("volume").map_or(d.volume, |v| v.clamp(0, 200) as u32),
-            mic_gain: num("mic_gain").map_or(d.mic_gain, |v| v.clamp(10, 500) as u32),
-            threshold: num("threshold").map_or(d.threshold, |v| v.clamp(-127, 0) as i32),
-            protocol: match get("protocol").as_deref() {
-                Some("2.6") => Protocol::V26,
-                Some("2.7") => Protocol::V27,
-                _ => Protocol::Auto,
-            },
-            hud: get("hud").as_deref() != Some("false"),
-            group_labels: get("group_labels").as_deref() != Some("false"),
+            mic_gain: num("mic_gain").map_or(d.mic_gain, |v| v.clamp(0, 200) as u32),
+            threshold: num("threshold").map_or(d.threshold, |v| v.clamp(-60, 0) as i32),
+            input_device: list("input_device"),
+            output_device: list("output_device"),
+            show_activation_icon: flag("show_activation_icon", true),
+            icon_position: get("icon_position").and_then(|v| Position::parse(&v)).unwrap_or(d.icon_position),
+            source_icons: num("source_icons").map_or(0, |v| v.clamp(0, 2) as u8),
+            overlay: flag("overlay", true),
+            overlay_position: get("overlay_position").and_then(|v| Position::parse(&v)).unwrap_or(d.overlay_position),
+            panning: flag("panning", true),
+            distance: num("distance").map(|v| v as i32),
+            line_volumes: pairs("line_volumes").into_iter().collect(),
+            line_mutes: list("line_mutes").split(',').filter(|s| !s.is_empty()).map(str::to_owned).collect(),
+            player_volumes: pairs("player_volumes")
+                .into_iter()
+                .filter_map(|(k, v)| Some((u128::from_str_radix(&k, 16).ok()?, v)))
+                .collect(),
+            player_mutes: list("player_mutes").split(',').filter_map(|s| u128::from_str_radix(s, 16).ok()).collect(),
         }
     }
 
     pub fn stored(&self) -> Vec<(&'static str, String)> {
+        let join = |it: Vec<String>| it.join(",");
         vec![
             ("mode", if self.mode == Mode::Voice { "voice" } else { "ptt" }.into()),
             ("muted", self.muted.to_string()),
@@ -150,54 +214,46 @@ impl Settings {
             ("volume", self.volume.to_string()),
             ("mic_gain", self.mic_gain.to_string()),
             ("threshold", self.threshold.to_string()),
-            ("protocol", match self.protocol {
-                Protocol::Auto => "auto",
-                Protocol::V26 => "2.6",
-                Protocol::V27 => "2.7",
-            }
-            .into()),
-            ("hud", self.hud.to_string()),
-            ("group_labels", self.group_labels.to_string()),
+            ("input_device", self.input_device.clone()),
+            ("output_device", self.output_device.clone()),
+            ("show_activation_icon", self.show_activation_icon.to_string()),
+            ("icon_position", self.icon_position.key().into()),
+            ("source_icons", self.source_icons.to_string()),
+            ("overlay", self.overlay.to_string()),
+            ("overlay_position", self.overlay_position.key().into()),
+            ("panning", self.panning.to_string()),
+            ("distance", self.distance.map(|d| d.to_string()).unwrap_or_default()),
+            ("line_volumes", join(self.line_volumes.iter().map(|(k, v)| format!("{k}={v}")).collect())),
+            ("line_mutes", join(self.line_mutes.iter().cloned().collect())),
+            ("player_volumes", join(self.player_volumes.iter().map(|(k, v)| format!("{k:x}={v}")).collect())),
+            ("player_mutes", join(self.player_mutes.iter().map(|k| format!("{k:x}")).collect())),
         ]
     }
 
-    /// The settings page's buttons, in order.
+    /// Options > Mods > Plasmo Voice > Settings: the main switches; the rest is the V screen.
     pub fn buttons(&self) -> Vec<String> {
-        let on_off = |b: bool| if b { "On" } else { "Off" };
+        let on_off = |b: bool| if b { "ON" } else { "OFF" };
         vec![
             format!("Activation: {}", if self.mode == Mode::Voice { "Voice" } else { "Push to talk" }),
-            format!("Microphone: {}", if self.muted { "Muted" } else { "On" }),
-            format!("Voice chat: {}", on_off(!self.disabled)),
-            format!("Voice volume: {}%", self.volume),
-            format!("Microphone gain: {}%", self.mic_gain),
-            format!("Voice activation level: {} dB", self.threshold),
-            format!("Protocol: {}", match self.protocol {
-                Protocol::Auto => "Automatic",
-                Protocol::V26 => "2.6.x",
-                Protocol::V27 => "2.7",
-            }),
-            format!("Status on screen: {}", on_off(self.hud)),
-            format!("Group names above players: {}", on_off(self.group_labels)),
+            format!("Microphone muted: {}", on_off(self.muted)),
+            format!("Voice chat disabled: {}", on_off(self.disabled)),
+            format!("Volume: {}%", self.volume),
+            format!("Microphone volume: {}%", self.mic_gain),
+            format!("Activation threshold: {} dB", self.threshold),
+            "More settings: press V in game".into(),
         ]
     }
 
     pub fn click(&mut self, button: usize) {
+        const VOLUMES: [u32; 9] = [0, 25, 50, 75, 100, 125, 150, 175, 200];
+        const THRESHOLDS: [i32; 7] = [-60, -50, -40, -30, -20, -10, 0];
         match button {
             0 => self.mode = if self.mode == Mode::Voice { Mode::PushToTalk } else { Mode::Voice },
             1 => self.muted = !self.muted,
             2 => self.disabled = !self.disabled,
-            3 => self.volume = next(&VOLUMES, self.volume),
-            4 => self.mic_gain = next(&GAINS, self.mic_gain),
-            5 => self.threshold = next(&THRESHOLDS, self.threshold),
-            6 => {
-                self.protocol = match self.protocol {
-                    Protocol::Auto => Protocol::V26,
-                    Protocol::V26 => Protocol::V27,
-                    Protocol::V27 => Protocol::Auto,
-                }
-            }
-            7 => self.hud = !self.hud,
-            8 => self.group_labels = !self.group_labels,
+            3 => self.volume = ui::step(&VOLUMES, &self.volume, false).unwrap_or(100),
+            4 => self.mic_gain = ui::step(&VOLUMES, &self.mic_gain, false).unwrap_or(100),
+            5 => self.threshold = ui::step(&THRESHOLDS, &self.threshold, false).unwrap_or(-30),
             _ => {}
         }
     }
@@ -270,6 +326,8 @@ struct Voice {
     devices: Arc<Mutex<Devices>>,
     redirect: Option<Redirect>,
     menu: ui::Menu,
+    /// The input and output devices' names, read when the Devices tab asks.
+    device_lists: (Vec<String>, Vec<String>),
 }
 
 fn voice() -> MutexGuard<'static, Voice> {
@@ -287,6 +345,7 @@ fn voice() -> MutexGuard<'static, Voice> {
             devices: Arc::new(Mutex::new(Devices::default())),
             redirect: None,
             menu: ui::Menu::default(),
+            device_lists: (Vec::new(), Vec::new()),
         })
     });
     VOICE.lock().unwrap_or_else(|e| e.into_inner())
@@ -361,6 +420,25 @@ impl Voice {
         c.volume = s.volume as f32 / 100.0;
         c.mic_gain = s.mic_gain as f32 / 100.0;
         c.threshold_db = s.threshold as f32;
+        c.panning = s.panning;
+        c.player_volumes = s
+            .player_volumes
+            .iter()
+            .map(|(&k, &v)| (k, v as f32 / 100.0))
+            .chain(s.player_mutes.iter().map(|&k| (k, 0.0)))
+            .collect();
+        c.line_volumes = s
+            .line_volumes
+            .iter()
+            .map(|(k, &v)| (pv::line_id(k), v as f32 / 100.0))
+            .chain(s.line_mutes.iter().map(|k| (pv::line_id(k), 0.0)))
+            .collect();
+        drop(c);
+        if let Some(d) = s.distance
+            && let Some(t) = self.shared.talk.lock().unwrap().as_mut()
+        {
+            t.distance = d.clamp(1, i32::from(i16::MAX)) as i16;
+        }
     }
 
     fn save(&mut self) {
@@ -416,7 +494,13 @@ impl Voice {
         let target = Target { secret, ip, port, server: split_host_port(&session.address) };
         session.conn = Some(Conn::start(target, redirect, self.shared.clone(), self.mixer.clone(), self.mic.clone()));
         if session.audio.is_none() && SOUND_CARD.load(Ordering::Relaxed) {
-            session.audio = Some(AudioIo::start(self.mixer.clone(), self.mic.clone(), self.devices.clone()));
+            session.audio = Some(AudioIo::start_with(
+                self.mixer.clone(),
+                self.mic.clone(),
+                self.devices.clone(),
+                self.settings.input_device.clone(),
+                self.settings.output_device.clone(),
+            ));
         }
     }
 
@@ -651,63 +735,186 @@ impl Voice {
         let session = self.session.as_ref();
         let connected = session.is_some_and(|s| s.connection.is_some())
             && *self.shared.status.lock().unwrap() == Status::Connected;
-        // The right side lists who has voice chat (Plasmo has no groups).
-        let mut players: Vec<ui::GroupRow> = session
+        let st = &self.settings;
+        let mut players: Vec<ui::PlayerRow> = session
             .map(|s| {
                 s.players
                     .values()
-                    .map(|p| ui::GroupRow {
+                    .filter(|p| Some(p.id) != s.own)
+                    .map(|p| ui::PlayerRow {
                         id: p.id,
                         name: p.nick.clone(),
-                        has_password: false,
-                        members: vec![if p.voice_disabled {
-                            "voice off".into()
-                        } else if p.mic_muted || p.muted {
-                            "muted".into()
+                        volume: st.player_volumes.get(&p.id).copied().unwrap_or(100),
+                        muted: st.player_mutes.contains(&p.id),
+                        state: if p.voice_disabled {
+                            "voice off"
+                        } else if p.muted {
+                            "server muted"
+                        } else if p.mic_muted {
+                            "muted"
                         } else {
-                            "voice on".into()
-                        }],
-                        ours: false,
+                            ""
+                        },
                     })
                     .collect()
             })
             .unwrap_or_default();
         players.sort_by_key(|g| g.name.to_lowercase());
+        let config = session.and_then(|s| s.config.as_ref());
+        let lines = config
+            .map(|c| {
+                let mut ls: Vec<_> = c.lines.iter().collect();
+                ls.sort_by_key(|l| -l.weight);
+                ls.into_iter()
+                    .map(|l| ui::LineRow {
+                        name: l.name.clone(),
+                        label: pretty(&l.name),
+                        icon: icons::name_of(&l.icon).unwrap_or("speaker"),
+                        volume: st.line_volumes.get(&l.name).copied().unwrap_or((l.default_volume * 100.0).round() as u32),
+                        muted: st.line_mutes.contains(&l.name),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let proximity = pv::activation_id("proximity");
+        let activation = config.and_then(|c| c.activations.iter().find(|a| a.id == proximity)).map(|a| {
+            let now = self.shared.talk.lock().unwrap().as_ref().map_or(a.default_distance, |t| i32::from(t.distance));
+            (a.name.clone(), a.distances.clone(), now)
+        });
+        let d = self.devices.lock().unwrap().clone();
+        let (inputs, outputs) = self.device_lists.clone();
         ui::View {
             status: self.status_line(),
             settings: self.settings.clone(),
             level_db: self.shared.level(),
             connected,
-            groups_enabled: false,
-            groups: players,
+            input_devices: inputs,
+            output_devices: outputs,
+            input_now: d.input.clone().unwrap_or_else(|e| e),
+            output_now: d.output.clone().unwrap_or_else(|e| e),
+            lines,
+            players,
+            activation,
             hotkeys,
         }
     }
 
-    /// What a click or Enter in the menu asks of the voice chat.
-    fn menu_action(&mut self, action: ui::Action) {
-        use ui::Action as A;
-        let Some(action) = self.menu.act(action) else { return };
-        match action {
-            A::Mode => self.click(0),
-            A::Mute => self.click(1),
-            A::Disable => self.click(2),
-            A::Labels => self.click(8),
-            A::Volume(d) => {
-                self.settings.volume = (self.settings.volume as i32 + d).clamp(0, 200) as u32;
-                self.save();
-            }
-            A::Gain(d) => {
-                self.settings.mic_gain = (self.settings.mic_gain as i32 + d).clamp(25, 500) as u32;
-                self.save();
-            }
-            A::Threshold(d) => {
-                self.settings.threshold = (self.settings.threshold + d).clamp(-80, 0);
-                self.save();
-            }
-            _ => {}
+    /// Restarts the sound card with the devices picked now.
+    fn reopen_audio(&mut self) {
+        let Some(s) = self.session.as_mut() else { return };
+        if s.audio.is_some() && SOUND_CARD.load(Ordering::Relaxed) {
+            s.audio = None;
+            s.audio = Some(AudioIo::start_with(
+                self.mixer.clone(),
+                self.mic.clone(),
+                self.devices.clone(),
+                self.settings.input_device.clone(),
+                self.settings.output_device.clone(),
+            ));
         }
     }
+
+    /// Tells the server the proximity distance picked (`PlayerActivationDistancesPacket`).
+    fn send_distance(&mut self) {
+        let Some(t) = self.shared.talk.lock().unwrap().clone() else { return };
+        self.send_pv(pv::activation_distances(&[(t.activation, i32::from(t.distance))]));
+    }
+
+    /// What a click in the menu asks of the voice chat.
+    fn menu_action(&mut self, action: ui::Action) {
+        use ui::{Action as A, Opt};
+        let Some(action) = self.menu.act(action) else { return };
+        let before = (self.settings.muted, self.settings.disabled);
+        let pct = |v: f32| ((v * 200.0) / 5.0).round() as u32 * 5;
+        match action {
+            A::Cycle(opt, back) => match opt {
+                Opt::InputDevice | Opt::OutputDevice => {
+                    self.device_lists = audio::device_names();
+                    let (list, now) = if opt == Opt::InputDevice {
+                        (&self.device_lists.0, &mut self.settings.input_device)
+                    } else {
+                        (&self.device_lists.1, &mut self.settings.output_device)
+                    };
+                    let mut all = vec![String::new()];
+                    all.extend(list.iter().cloned());
+                    *now = ui::step(&all, now, back).unwrap_or_default();
+                    self.save();
+                    self.reopen_audio();
+                    return;
+                }
+                Opt::Mode => self.settings.mode = if self.settings.mode == Mode::Voice { Mode::PushToTalk } else { Mode::Voice },
+                Opt::MicMuted => self.settings.muted = !self.settings.muted,
+                Opt::VoiceDisabled => self.settings.disabled = !self.settings.disabled,
+                Opt::ActivationIcon => self.settings.show_activation_icon = !self.settings.show_activation_icon,
+                Opt::IconPosition => {
+                    self.settings.icon_position = ui::step(&Position::ICON, &self.settings.icon_position, back).unwrap_or(Position::BottomCenter)
+                }
+                Opt::SourceIcons => self.settings.source_icons = (self.settings.source_icons + if back { 2 } else { 1 }) % 3,
+                Opt::Overlay => self.settings.overlay = !self.settings.overlay,
+                Opt::OverlayPosition => {
+                    self.settings.overlay_position = ui::step(&Position::OVERLAY, &self.settings.overlay_position, back).unwrap_or(Position::TopLeft)
+                }
+                Opt::Panning => self.settings.panning = !self.settings.panning,
+                _ => {}
+            },
+            A::Slide(opt, v) => match opt {
+                Opt::MicVolume => self.settings.mic_gain = pct(v),
+                Opt::Volume => self.settings.volume = pct(v),
+                Opt::Threshold => self.settings.threshold = (v * 60.0).round() as i32 - 60,
+                Opt::Distance => {
+                    let proximity = pv::activation_id("proximity");
+                    let distances = self
+                        .session
+                        .as_ref()
+                        .and_then(|s| s.config.as_ref())
+                        .and_then(|c| c.activations.iter().find(|a| a.id == proximity))
+                        .map(|a| a.distances.clone())
+                        .unwrap_or_default();
+                    let picked = if distances.len() == 2 && distances[0] == -1 {
+                        Some(((v * distances[1] as f32).round() as i32).max(1))
+                    } else if !distances.is_empty() {
+                        Some(distances[((v * (distances.len() - 1) as f32).round() as usize).min(distances.len() - 1)])
+                    } else {
+                        None
+                    };
+                    if let Some(d) = picked {
+                        self.settings.distance = Some(d);
+                        self.save();
+                        self.send_distance();
+                        return;
+                    }
+                }
+                _ => {}
+            },
+            A::LineSlide(name, v) => {
+                self.settings.line_volumes.insert(name, pct(v));
+            }
+            A::LineMute(name) => {
+                if !self.settings.line_mutes.remove(&name) {
+                    self.settings.line_mutes.insert(name);
+                }
+            }
+            A::PlayerSlide(id, v) => {
+                self.settings.player_volumes.insert(id, pct(v));
+            }
+            A::PlayerMute(id) => {
+                if !self.settings.player_mutes.remove(&id) {
+                    self.settings.player_mutes.insert(id);
+                }
+            }
+            _ => return,
+        }
+        self.save();
+        if before != (self.settings.muted, self.settings.disabled) {
+            self.send_state();
+        }
+    }
+}
+
+/// `proximity` → `Proximity`, for a line without a translation of ours.
+fn pretty(name: &str) -> String {
+    let mut c = name.chars();
+    c.next().map_or_else(String::new, |f| f.to_uppercase().chain(c).collect::<String>().replace('_', " "))
 }
 
 /// Opens the menu, opened by a key typing `opened_by`.
@@ -810,7 +1017,7 @@ const YELLOW: u32 = 0xFFFF55;
 /// voice chat.
 pub fn hud(ptt_key: &str) -> Vec<Line> {
     let v = voice();
-    let Some(session) = v.session.as_ref().filter(|_| v.settings.hud) else {
+    let Some(session) = v.session.as_ref() else {
         return Vec::new();
     };
     if session.connection.is_none() {
@@ -882,7 +1089,7 @@ pub fn hud_icon() -> Option<&'static str> {
     let v = voice();
     let session = v.session.as_ref()?;
     session.connection.as_ref()?;
-    if *v.shared.status.lock().unwrap() != Status::Connected {
+    if *v.shared.status.lock().unwrap() != Status::Connected || !v.settings.show_activation_icon {
         return None;
     }
     if v.shared.timed_out.load(Ordering::Relaxed) {
@@ -912,7 +1119,7 @@ pub fn player_icon(player: u128) -> Option<&'static str> {
     let v = voice();
     let session = v.session.as_ref()?;
     session.connection.as_ref()?;
-    if *v.shared.status.lock().unwrap() != Status::Connected || Some(player) == session.own {
+    if *v.shared.status.lock().unwrap() != Status::Connected || Some(player) == session.own || v.settings.source_icons == 2 {
         return None;
     }
     let hidden = |what: &str| session.config.as_ref().is_some_and(|c| c.icon_visibility.iter().any(|h| h == what));
@@ -943,6 +1150,12 @@ pub fn player_icon(player: u128) -> Option<&'static str> {
     Some(icons::name_of(&icon).unwrap_or("speaker"))
 }
 
+/// Where the activation icon and the overlay go (Overlay tab).
+pub fn positions() -> (Position, Position) {
+    let v = voice();
+    (v.settings.icon_position, v.settings.overlay_position)
+}
+
 /// Where player icons sit above the name tag, from the server's config.
 pub fn icon_offset() -> [f64; 3] {
     voice().session.as_ref().and_then(|s| s.config.as_ref()).map_or([0.0; 3], |c| c.icon_offset)
@@ -951,7 +1164,7 @@ pub fn icon_offset() -> [f64; 3] {
 /// The overlay (`OverlayRenderer`): who is talking now, by name, with their line's icon.
 pub fn overlay() -> Vec<(String, &'static str)> {
     let v = voice();
-    let Some(session) = v.session.as_ref().filter(|s| s.connection.is_some()) else {
+    let Some(session) = v.session.as_ref().filter(|s| s.connection.is_some() && v.settings.overlay) else {
         return Vec::new();
     };
     let talking = v.shared.talking.lock().unwrap();

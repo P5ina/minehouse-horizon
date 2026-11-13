@@ -39,6 +39,10 @@ pub struct Controls {
     pub mic_gain: f32,
     pub volume: f32,
     pub player_volumes: HashMap<u128, f32>,
+    /// Source lines' volumes by line id (`SourceLineVolumes`).
+    pub line_volumes: HashMap<Uuid, f32>,
+    /// Pan voices by where they come from (Advanced > Panning).
+    pub panning: bool,
 }
 
 impl Default for Controls {
@@ -53,6 +57,8 @@ impl Default for Controls {
             mic_gain: 1.0,
             volume: 1.0,
             player_volumes: HashMap::new(),
+            line_volumes: HashMap::new(),
+            panning: true,
         }
     }
 }
@@ -372,10 +378,12 @@ fn play(
         SourceKind::Direct { sender, .. } => sender.as_ref().map(|s| s.id),
         _ => None,
     };
-    let (volume, listener) = {
+    let (volume, listener, panning) = {
         let c = shared.controls.lock().unwrap();
-        let v = c.volume * speaker.and_then(|s| c.player_volumes.get(&s).copied()).unwrap_or(1.0);
-        (v, *shared.listener.lock().unwrap())
+        let v = c.volume
+            * speaker.and_then(|s| c.player_volumes.get(&s).copied()).unwrap_or(1.0)
+            * c.line_volumes.get(&info.line).copied().unwrap_or(1.0);
+        (v, *shared.listener.lock().unwrap(), c.panning)
     };
     let max = f32::from(distance.max(1));
     let gain = match &info.kind {
@@ -385,8 +393,9 @@ fn play(
         SourceKind::Direct { .. } => Some([1.0, 1.0]),
     };
     let Some(gain) = gain else { return };
-    let line_volume = 1.0;
-    let gain = gain.map(|g| g * volume * line_volume);
+    // Without panning both ears hear the louder side.
+    let gain = if panning { gain } else { [gain[0].max(gain[1]); 2] };
+    let gain = gain.map(|g| g * volume);
     let mut m = mixer.lock().unwrap();
     for f in frames {
         m.push(info.id, Frame { pcm: f.iter().map(|&v| f32::from(v) / 32768.0).collect(), gain });

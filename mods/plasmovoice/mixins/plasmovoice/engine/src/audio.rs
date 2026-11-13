@@ -49,17 +49,28 @@ pub struct AudioIo {
 
 impl AudioIo {
     pub fn start(mixer: Arc<Mutex<Mixer>>, mic: Arc<MicQueue>, devices: Arc<Mutex<Devices>>) -> Self {
+        Self::start_with(mixer, mic, devices, String::new(), String::new())
+    }
+
+    /// With the devices the player picked by name ("" for the system's default).
+    pub fn start_with(
+        mixer: Arc<Mutex<Mixer>>,
+        mic: Arc<MicQueue>,
+        devices: Arc<Mutex<Devices>>,
+        input_name: String,
+        output_name: String,
+    ) -> Self {
         let stop = Arc::new(AtomicBool::new(false));
         let flag = stop.clone();
         let thread = std::thread::Builder::new()
             .name("voicechat-audio".into())
             .spawn(move || {
                 let host = cpal::default_host();
-                let (output, out_info) = match open_output(&host, mixer) {
+                let (output, out_info) = match open_output(&host, mixer, &output_name) {
                     Ok((s, name)) => (Some(s), Ok(name)),
                     Err(e) => (None, Err(e)),
                 };
-                let (input, in_info) = match open_input(&host, mic) {
+                let (input, in_info) = match open_input(&host, mic, &input_name) {
                     Ok((s, name)) => (Some(s), Ok(name)),
                     Err(e) => (None, Err(e)),
                 };
@@ -102,8 +113,30 @@ fn choose(
         .or(default.filter(|d| usable(d.sample_format())))
 }
 
-fn open_output(host: &cpal::Host, mixer: Arc<Mutex<Mixer>>) -> Result<(Stream, String), String> {
-    let device = host.default_output_device().ok_or("no speakers")?;
+/// The input and output devices' names, for the Devices tab.
+pub fn device_names() -> (Vec<String>, Vec<String>) {
+    let host = cpal::default_host();
+    let names = |d: Result<Box<dyn Iterator<Item = cpal::Device>>, String>| -> Vec<String> {
+        d.map(|it| it.filter_map(|d| d.name().ok()).collect()).unwrap_or_default()
+    };
+    let inputs = names(host.input_devices().map(|i| Box::new(i) as Box<dyn Iterator<Item = cpal::Device>>).map_err(|e| e.to_string()));
+    let outputs = names(host.output_devices().map(|i| Box::new(i) as Box<dyn Iterator<Item = cpal::Device>>).map_err(|e| e.to_string()));
+    (inputs, outputs)
+}
+
+fn pick(host: &cpal::Host, input: bool, name: &str) -> Option<cpal::Device> {
+    if !name.is_empty() {
+        let found = if input { host.input_devices().ok() } else { host.output_devices().ok() }
+            .and_then(|mut it| it.find(|d| d.name().is_ok_and(|n| n == name)));
+        if found.is_some() {
+            return found;
+        }
+    }
+    if input { host.default_input_device() } else { host.default_output_device() }
+}
+
+fn open_output(host: &cpal::Host, mixer: Arc<Mutex<Mixer>>, name: &str) -> Result<(Stream, String), String> {
+    let device = pick(host, false, name).ok_or("no speakers")?;
     let name = device.name().unwrap_or_else(|_| "speakers".into());
     let configs = device.supported_output_configs().map(|c| c.collect()).unwrap_or_default();
     let supported = choose(configs, device.default_output_config().ok()).ok_or("no usable speaker format")?;
@@ -152,8 +185,8 @@ fn output<T: SizedSample + Send + 'static>(
         .map_err(|e| e.to_string())
 }
 
-fn open_input(host: &cpal::Host, mic: Arc<MicQueue>) -> Result<(Stream, String), String> {
-    let device = host.default_input_device().ok_or("no microphone")?;
+fn open_input(host: &cpal::Host, mic: Arc<MicQueue>, name: &str) -> Result<(Stream, String), String> {
+    let device = pick(host, true, name).ok_or("no microphone")?;
     let name = device.name().unwrap_or_else(|_| "microphone".into());
     let configs = device.supported_input_configs().map(|c| c.collect()).unwrap_or_default();
     let supported = choose(configs, device.default_input_config().ok()).ok_or("no usable microphone format")?;

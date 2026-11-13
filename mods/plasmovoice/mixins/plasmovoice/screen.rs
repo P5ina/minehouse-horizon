@@ -1,5 +1,4 @@
-// Draws the voice chat menu: the connection, the controls, the hotkeys as
-// bound now, and the groups.
+// Draws Plasmo Voice's settings screen: its tabs and the open tab's options.
 fn voicechat_screen(
     game: &crate::game::Game<'_>,
     batch: &mut horizon_client::hud::HudBatch,
@@ -18,6 +17,11 @@ fn voicechat_screen(
         match draw {
             vc::ui::Draw::Fill(rect, argb) => game.native_fill(batch, rect, argb),
             vc::ui::Draw::Text(text, at, rgb, shadow) => game.native_text(batch, &text, at, rgb, shadow),
+            vc::ui::Draw::Icon(icon, dst) => {
+                if let Some(src) = vc::icons::cell(icon) {
+                    game.native_sprite(batch, "horizon/modimage", src, dst);
+                }
+            }
         }
     }
 }
