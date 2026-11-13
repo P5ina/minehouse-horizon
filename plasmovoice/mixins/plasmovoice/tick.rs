@@ -2,7 +2,7 @@
 // then the payloads the voice chat has for the server, its settings and its
 // chat lines.
 fn voicechat_tick(game: &mut crate::game::Game<'_>) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     let Some(r) = game.remote.as_ref() else {
         return;
     };

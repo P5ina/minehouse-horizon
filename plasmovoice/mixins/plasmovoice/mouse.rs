@@ -5,7 +5,7 @@ fn voicechat_mouse(
     button: i32,
     canceled: &mut bool,
 ) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if game.native_mod_screen() != Some(vc::ID) {
         return;
     }

@@ -2,7 +2,7 @@
 // held; mute and voice chat off/on on a press. A key goes down only while
 // playing, but letting go always counts.
 fn voicechat_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if !game.native_on(vc::ID) {
         return;
     }

@@ -1,6 +1,6 @@
 // The mod's row in Options > Mods, with its keys.
 fn voicechat_listed(mods: &mut Vec<crate::game::native_hooks::NativeMod>) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     mods.push(crate::game::native_hooks::NativeMod {
         id: vc::ID.into(),
         title: format!("{} {}", vc::NAME, vc::VERSION),

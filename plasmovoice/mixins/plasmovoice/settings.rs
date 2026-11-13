@@ -1,6 +1,6 @@
 // The mod's settings page: activation, microphone, volumes and the protocol.
 fn voicechat_page(game: &mut crate::game::Game<'_>, mod_id: &str, buttons: &mut Vec<String>) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if mod_id != vc::ID {
         return;
     }

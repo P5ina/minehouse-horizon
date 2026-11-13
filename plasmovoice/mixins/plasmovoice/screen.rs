@@ -5,7 +5,7 @@ fn voicechat_screen(
     batch: &mut horizon_client::hud::HudBatch,
     screen: &crate::game::native_hooks::NativeScreenView<'_>,
 ) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if game.native_mod_screen() != Some(vc::ID) {
         return;
     }

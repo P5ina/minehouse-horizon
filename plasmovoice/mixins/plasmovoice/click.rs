@@ -1,6 +1,6 @@
 // A click on the settings page: the button's setting moves to its next value.
 fn voicechat_click(game: &mut crate::game::Game<'_>, mod_id: &str, button: usize) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if mod_id != vc::ID {
         return;
     }

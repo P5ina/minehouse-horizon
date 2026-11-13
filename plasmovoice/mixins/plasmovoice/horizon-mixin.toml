@@ -1,13 +1,13 @@
 [mod]
-id = "voicechat"
-version = "1.0.1"
+id = "plasmovoice"
+version = "0.1.0"
 priority = 100
 
 # Pinned: besides the native hook points it reads the server's custom payloads
 # and the other players' positions inside the game's multiplayer code
 # (`game::remote`), which are not part of the stable hook points.
 [compatibility]
-horizon_revision = "fdc87aecdbd116bf1e08adcd062fcbaea8c2e2ca"
+horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
 
 # Simple Voice Chat's protocol, Opus, the sound card and the voice threads.
 [[crate]]

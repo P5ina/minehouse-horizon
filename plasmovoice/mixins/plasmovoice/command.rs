@@ -1,6 +1,6 @@
 // `/vc …`: the voice chat's own command, answered in the chat.
 fn voicechat_command(game: &mut crate::game::Game<'_>, command: &str, ran: &mut bool) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if *ran || !game.native_on(vc::ID) {
         return;
     }

@@ -1,35 +1,36 @@
-//! Horizon Voice Chat: a client for the Simple Voice Chat protocol (an
-//! unofficial one, not affiliated with Simple Voice Chat or its author), speaking it so a Horizon player talks with players on the
-//! Java mod on any server that has the voice chat plugin or mod.
+//! Plasmo Voice for Horizon: a client for the Plasmo Voice 2.x protocol (an
+//! unofficial one, not affiliated with Plasmo Voice or its authors), so a
+//! Horizon player talks with players on the Java mod on a server that runs
+//! Plasmo Voice. Built on Horizon Voice Chat by Nirokx (MIT): its audio,
+//! mixer, menu and HUD; the protocol and the connection are Plasmo's.
 //!
 //! The game thread calls [`tick`], [`payload`], [`key`], [`command`] and the
 //! HUD and settings functions; the voice runs on threads of its own.
 pub mod audio;
 pub mod buf;
-pub mod crypt;
 pub mod labels;
 pub mod mix;
 pub mod net;
 pub mod opus;
-pub mod proto;
 pub mod pv;
 pub mod pvcrypt;
 pub mod ui;
 
 use audio::{AudioIo, Devices, MicQueue};
 use mix::{Listener, Mixer};
-use net::{Conn, Mode, Redirect, Shared, Status};
-use proto::{COMPAT_26, COMPAT_27, Group, PlayerState, Secret};
+use net::{Conn, Mode, Redirect, Shared, Status, Talk, Target};
+use pv::{PlayerInfo, Tcp, Uuid};
+use pvcrypt::{Aes, RsaKey};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, LazyLock, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
-pub const ID: &str = "voicechat";
-pub const NAME: &str = "Horizon Voice Chat";
-pub const VERSION: &str = "1.0.0";
-pub const DESCRIPTION: &str = "Talk with players who use the Simple Voice Chat mod, on servers that have it (unofficial). \
-V opens the menu: controls, hotkeys and groups. Push to talk (Caps Lock) or voice activation.";
+pub const ID: &str = "plasmovoice";
+pub const NAME: &str = "Plasmo Voice";
+pub const VERSION: &str = "0.1.0";
+pub const DESCRIPTION: &str = "Talk with players who use the Plasmo Voice mod, on servers that have it (unofficial). \
+V opens the menu. Push to talk (Caps Lock) or voice activation.";
 
 pub const KEY_PTT: &str = "push_to_talk";
 pub const KEY_WHISPER: &str = "whisper";
@@ -204,73 +205,49 @@ impl Settings {
 struct Session {
     address: String,
     joined: Instant,
-    /// The versions asked so far, and when the next is due.
-    asked: Vec<i32>,
-    next_ask: Instant,
-    /// The version that answered here before.
-    remembered: Option<i32>,
-    secret: Option<Secret>,
+    /// When we last told the server who we are (`PlayerInfoPacket`), and how often.
+    info_sent: Option<Instant>,
+    info_count: u32,
+    /// The connection packet: there is Plasmo Voice here.
+    connection: Option<(Uuid, String, u16)>,
+    config: Option<pv::Config>,
     conn: Option<Conn>,
     audio: Option<AudioIo>,
-    states: HashMap<u128, PlayerState>,
-    groups: HashMap<u128, Group>,
-    group: Option<u128>,
+    players: HashMap<Uuid, PlayerInfo>,
 }
 
 impl Session {
-    fn new(address: &str, remembered: Option<i32>) -> Self {
-        let now = Instant::now();
+    fn new(address: &str) -> Self {
         Self {
             address: address.to_owned(),
-            joined: now,
-            asked: Vec::new(),
-            // The server knows the player a moment after the join.
-            next_ask: now + Duration::from_secs(1),
-            remembered,
-            secret: None,
+            joined: Instant::now(),
+            info_sent: None,
+            info_count: 0,
+            connection: None,
+            config: None,
             conn: None,
             audio: None,
-            states: HashMap::new(),
-            groups: HashMap::new(),
-            group: None,
+            players: HashMap::new(),
         }
     }
 
-    /// The names of a group's members, sorted.
-    fn members(&self, group: u128) -> Vec<String> {
-        let mut names: Vec<String> = self
-            .states
-            .values()
-            .filter(|p| p.group == Some(group) && !p.disconnected)
-            .map(|p| p.name.clone())
-            .collect();
-        names.sort_by_key(|n| n.to_lowercase());
-        names
+    fn name(&self, id: &Uuid) -> Option<String> {
+        self.players.get(id).map(|p| p.nick.clone())
     }
+}
 
-    fn own_name(&self) -> String {
-        let own = self.secret.as_ref().map(|s| s.player);
-        own.and_then(|id| self.states.get(&id)).map(|p| p.name.clone()).unwrap_or_default()
+/// The RSA key the server seals its voice key with: one per game, made off
+/// the game thread (a 2048-bit key takes a moment).
+fn rsa_key() -> Option<Arc<RsaKey>> {
+    static KEY: LazyLock<Mutex<Option<Arc<RsaKey>>>> = LazyLock::new(|| Mutex::new(None));
+    static STARTED: AtomicBool = AtomicBool::new(false);
+    if !STARTED.swap(true, Ordering::Relaxed) {
+        let _ = std::thread::Builder::new().name("plasmovoice-rsa".into()).spawn(|| {
+            let key = Arc::new(RsaKey::generate(2048));
+            *KEY.lock().unwrap() = Some(key);
+        });
     }
-
-    fn compat(&self) -> i32 {
-        self.secret.as_ref().map_or(COMPAT_26, |s| s.compat)
-    }
-
-    /// The versions to ask, in order, three times for a server still starting.
-    /// Only one version: a server may kick a client that asks with one it
-    /// doesn't speak. Automatic uses the one that answered here before, else
-    /// the releases'.
-    fn plan(&self, protocol: Protocol) -> Vec<i32> {
-        match protocol {
-            Protocol::V26 => vec![COMPAT_26, COMPAT_26, COMPAT_26],
-            Protocol::V27 => vec![COMPAT_27, COMPAT_27, COMPAT_27],
-            Protocol::Auto => match self.remembered {
-                Some(COMPAT_27) => vec![COMPAT_27, COMPAT_27, COMPAT_27],
-                _ => vec![COMPAT_26, COMPAT_26, COMPAT_26],
-            },
-        }
-    }
+    KEY.lock().unwrap().clone()
 }
 
 struct Voice {
@@ -326,14 +303,46 @@ pub fn mixer() -> Arc<Mutex<Mixer>> {
     voice().mixer.clone()
 }
 
-/// The settings key a server's remembered version is kept under.
-fn compat_key(address: &str) -> String {
-    let clean: String = address
-        .to_lowercase()
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() || c == '.' || c == '-' { c } else { '_' })
-        .collect();
-    format!("compat.{clean}")
+/// `host[:port]` → host and port (25565 by default).
+fn split_host_port(s: &str) -> (String, u16) {
+    if let Some(rest) = s.strip_prefix('[')
+        && let Some((host, after)) = rest.split_once(']')
+    {
+        let port = after.strip_prefix(':').and_then(|p| p.parse().ok()).unwrap_or(25565);
+        return (host.to_owned(), port);
+    }
+    match s.rsplit_once(':') {
+        Some((h, p)) if !h.contains(':') => (h.to_owned(), p.parse().unwrap_or(25565)),
+        _ => (s.to_owned(), 25565),
+    }
+}
+
+/// The opus application Plasmo's encoder settings name (`VOIP`, `AUDIO`, `RESTRICTED_LOWDELAY`).
+fn opus_application(mode: Option<&str>) -> i32 {
+    match mode {
+        Some("AUDIO") => opus::APPLICATION_AUDIO,
+        Some("RESTRICTED_LOWDELAY") => opus::APPLICATION_RESTRICTED_LOWDELAY,
+        _ => opus::APPLICATION_VOIP,
+    }
+}
+
+/// How we talk: the proximity activation (or the lightest one), at its default distance.
+fn talk_from(config: &pv::Config) -> Option<Talk> {
+    let proximity = pv::activation_id("proximity");
+    let a = config
+        .activations
+        .iter()
+        .find(|a| a.id == proximity)
+        .or_else(|| config.activations.iter().filter(|a| a.proximity).min_by_key(|a| a.weight))?;
+    let codec = a.encoder.as_ref().or(config.encoder.as_ref());
+    Some(Talk {
+        activation: a.id,
+        distance: a.default_distance.clamp(1, i32::from(i16::MAX)) as i16,
+        stereo: false,
+        opus_application: opus_application(codec.and_then(|c| c.param("mode"))),
+        bitrate: codec.and_then(|c| c.param("bitrate")).and_then(|b| b.parse().ok()).unwrap_or(-1000),
+        mtu: usize::try_from(config.mtu).unwrap_or(1024).clamp(64, 2048),
+    })
 }
 
 impl Voice {
@@ -354,17 +363,27 @@ impl Voice {
         self.store.extend(stored.into_iter().map(|(k, v)| (k.to_owned(), v)));
     }
 
-    fn send(&mut self, (channel, data): (&str, Vec<u8>)) {
-        self.outbox.push((channel.to_owned(), data));
+    fn send_pv(&mut self, data: Vec<u8>) {
+        self.outbox.push((pv::CHANNEL.to_owned(), data));
     }
 
     /// Tells the server whether the player muted or turned voice chat off.
     fn send_state(&mut self) {
-        let Some(compat) = self.session.as_ref().filter(|s| s.secret.is_some()).map(Session::compat) else {
+        if self.session.as_ref().is_none_or(|s| s.connection.is_none()) {
             return;
-        };
+        }
         let (muted, disabled) = (self.settings.muted, self.settings.disabled);
-        self.send(proto::update_state(compat, muted, disabled));
+        self.send_pv(pv::player_state(disabled, muted));
+    }
+
+    fn send_info(&mut self) {
+        let Some(key) = rsa_key() else { return };
+        let (muted, disabled) = (self.settings.muted, self.settings.disabled);
+        self.send_pv(pv::player_info(&key.public_der(), disabled, muted));
+        if let Some(s) = self.session.as_mut() {
+            s.info_sent = Some(Instant::now());
+            s.info_count += 1;
+        }
     }
 
     fn leave(&mut self) {
@@ -372,99 +391,82 @@ impl Voice {
         self.session = None;
         self.shared.transmitting.store(false, Ordering::Relaxed);
         self.shared.talking.lock().unwrap().clear();
+        self.shared.sources.lock().unwrap().clear();
+        self.shared.outbox.lock().unwrap().clear();
+        *self.shared.aes.lock().unwrap() = None;
+        *self.shared.talk.lock().unwrap() = None;
         *self.shared.status.lock().unwrap() = Status::Idle;
         *self.shared.mic_error.lock().unwrap() = None;
         self.mixer.lock().unwrap().clear();
     }
 
-    fn on_secret(&mut self, data: &[u8]) {
-        let Ok(secret) = Secret::parse(data) else {
-            self.chat.push("Voice chat: the server sent a secret this version can't read".into());
-            return;
-        };
+    fn on_connection(&mut self, secret: Uuid, ip: String, port: i32) {
         let Some(redirect) = self.redirect else { return };
         let Some(session) = self.session.as_mut() else { return };
-        if session.remembered != Some(secret.compat) {
-            session.remembered = Some(secret.compat);
-            self.store.push((compat_key(&session.address), secret.compat.to_string()));
-        }
-        // A new secret replaces the connection.
+        // A new connection packet replaces the connection.
         session.conn = None;
-        let server = match proto::split_host_port(&session.address) {
-            Some((host, port)) => (host, port.unwrap_or(25565)),
-            None => (session.address.clone(), 25565),
-        };
-        if let Err(e) = opus::check() {
-            *self.shared.mic_error.lock().unwrap() = Some(e.clone());
-            self.chat.push(format!("Voice chat can't start: {e}"));
-        }
-        session.secret = Some(secret.clone());
-        session.conn = Some(Conn::start(
-            secret,
-            server,
-            redirect,
-            self.shared.clone(),
-            self.mixer.clone(),
-            self.mic.clone(),
-        ));
+        let port = u16::try_from(port).unwrap_or(0);
+        session.connection = Some((secret, ip.clone(), port));
+        let target = Target { secret, ip, port, server: split_host_port(&session.address) };
+        session.conn = Some(Conn::start(target, redirect, self.shared.clone(), self.mixer.clone(), self.mic.clone()));
         if session.audio.is_none() && SOUND_CARD.load(Ordering::Relaxed) {
             session.audio = Some(AudioIo::start(self.mixer.clone(), self.mic.clone(), self.devices.clone()));
+        }
+    }
+
+    fn on_config(&mut self, config: pv::Config) {
+        let aes = match &config.encryption {
+            Some((algorithm, sealed)) => {
+                let opened = rsa_key().and_then(|k| k.decrypt(sealed)).and_then(Aes::new);
+                match opened {
+                    Some(aes) if algorithm.starts_with("AES") => Some(Arc::new(aes)),
+                    _ => {
+                        self.chat.push(format!("Voice chat: can't open the server's {algorithm} key"));
+                        *self.shared.status.lock().unwrap() = Status::Failed("bad encryption key".into());
+                        return;
+                    }
+                }
+            }
+            // Plasmo always encrypts; a server without a key can't be heard here.
+            None => None,
+        };
+        *self.shared.aes.lock().unwrap() = aes;
+        *self.shared.talk.lock().unwrap() = talk_from(&config);
+        if let Some(s) = self.session.as_mut() {
+            s.config = Some(config);
         }
         self.send_state();
     }
 
-    fn on_payload(&mut self, channel: &str, data: &[u8]) {
-        if channel == "voicechat:secret" {
-            self.on_secret(data);
-            return;
-        }
-        let Some(session) = self.session.as_mut() else { return };
-        let compat = session.compat();
-        match channel {
-            "voicechat:states" => {
-                if let Ok(states) = PlayerState::parse_all(data, compat) {
-                    session.states = states.into_iter().map(|s| (s.uuid, s)).collect();
+    fn on_payload(&mut self, data: &[u8]) {
+        let Ok(packet) = pv::decode_tcp(data) else { return };
+        match packet {
+            Tcp::Connection { secret, ip, port } => self.on_connection(secret, ip, port),
+            Tcp::PlayerInfoRequest => self.send_info(),
+            Tcp::Config(c) => self.on_config(c),
+            Tcp::PlayerList(list) => {
+                if let Some(s) = self.session.as_mut() {
+                    s.players = list.into_iter().map(|p| (p.id, p)).collect();
                 }
             }
-            "voicechat:state" => {
-                if let Ok(s) = PlayerState::parse(data, compat) {
-                    session.states.insert(s.uuid, s);
+            Tcp::PlayerInfoUpdate(p) => {
+                if let Some(s) = self.session.as_mut() {
+                    s.players.insert(p.id, p);
                 }
             }
-            "voicechat:remove_state" => {
-                if let Ok(id) = proto::parse_uuid(data) {
-                    session.states.remove(&id);
+            Tcp::PlayerDisconnect(id) => {
+                if let Some(s) = self.session.as_mut() {
+                    s.players.remove(&id);
                 }
             }
-            "voicechat:add_group" => {
-                if let Ok(g) = Group::parse(data) {
-                    session.groups.insert(g.id, g);
-                }
+            Tcp::SourceInfo(source) => {
+                self.shared.sources.lock().unwrap().insert(source.id, source);
             }
-            "voicechat:remove_group" => {
-                if let Ok(id) = proto::parse_uuid(data) {
-                    session.groups.remove(&id);
-                }
-            }
-            "voicechat:joined_group" => {
-                if let Ok((group, wrong_password)) = proto::parse_joined_group(data) {
-                    if wrong_password {
-                        self.chat.push("Voice chat: wrong group password".into());
-                        self.menu.say("Wrong password", true);
-                    } else {
-                        session.group = group;
-                        let name = group.and_then(|g| session.groups.get(&g)).map(|g| g.name.clone());
-                        match &name {
-                            Some(n) => self.menu.say(format!("Joined {n}"), false),
-                            None if group.is_some() => self.menu.say("Joined the group", false),
-                            None => self.menu.say("Left the group", false),
-                        }
-                        self.chat.push(match name {
-                            Some(n) => format!("Voice chat: joined the group {n}"),
-                            None if group.is_some() => "Voice chat: joined a group".into(),
-                            None => "Voice chat: left the group".into(),
-                        });
-                    }
+            Tcp::SourceAudioEnd { source, .. } => net::end_source(source, &self.shared, &self.mixer),
+            Tcp::ActivationRegister(a) if a.id == pv::activation_id("proximity") => {
+                if let Some(t) = self.shared.talk.lock().unwrap().as_mut() {
+                    t.activation = a.id;
+                    t.distance = a.default_distance.clamp(1, i32::from(i16::MAX)) as i16;
                 }
             }
             _ => {}
@@ -482,36 +484,37 @@ impl Voice {
             self.leave();
         }
         if self.session.is_none() {
-            let remembered = get(&compat_key(world.address)).and_then(|v| v.parse().ok());
-            self.session = Some(Session::new(world.address, remembered));
-            self.send(("minecraft:register", proto::register_payload()));
+            self.session = Some(Session::new(world.address));
+            self.outbox.push(("minecraft:register".into(), pv::register_payload()));
         }
         if let Some(l) = world.listener {
             *self.shared.listener.lock().unwrap() = l;
         }
         *self.shared.players.lock().unwrap() = world.players.into_iter().collect();
 
-        let protocol = self.settings.protocol;
-        let session = self.session.as_mut().expect("made above");
+        // The server asks who we are when we join, which may be before we
+        // registered the channel: tell it anyway, a few times, until it connects us.
         let now = Instant::now();
-        if session.secret.is_none() && now >= session.next_ask {
-            let plan = session.plan(protocol);
-            if let Some(&compat) = plan.get(session.asked.len()) {
-                session.asked.push(compat);
-                session.next_ask = now + Duration::from_secs(3);
-                self.send(proto::request_secret(compat));
-            }
+        let session = self.session.as_ref().expect("made above");
+        let due = session.connection.is_none()
+            && session.info_count < 4
+            && now - session.joined > Duration::from_secs(1)
+            && session.info_sent.is_none_or(|t| now - t > Duration::from_secs(5));
+        if due {
+            self.send_info();
         }
-        // The connection timed out: ask again, as the mod reconnects.
-        let session = self.session.as_mut().expect("made above");
+        let queued: Vec<Vec<u8>> = std::mem::take(&mut *self.shared.outbox.lock().unwrap());
+        for p in queued {
+            self.send_pv(p);
+        }
+        // The UDP connection failed: ask again, as Plasmo reconnects.
         let failed = matches!(*self.shared.status.lock().unwrap(), Status::Failed(_));
-        if failed && session.secret.is_some() && now - session.joined > Duration::from_secs(5) {
-            let compat = session.compat();
-            session.secret = None;
+        let session = self.session.as_mut().expect("made above");
+        if failed && session.connection.is_some() && session.info_sent.is_none_or(|t| now - t > Duration::from_secs(10)) {
+            session.connection = None;
             session.conn = None;
-            session.asked.clear();
-            session.next_ask = now + Duration::from_secs(5);
-            session.remembered = Some(compat);
+            session.info_count = 0;
+            session.info_sent = Some(now);
         }
     }
 }
@@ -542,12 +545,12 @@ pub struct Tick {
     pub chat: Vec<String>,
 }
 
-/// A custom payload from the server: true when it was the voice chat's.
+/// A custom payload from the server: true when it was Plasmo Voice's.
 pub fn payload(channel: &str, data: &[u8]) -> bool {
-    if !channel.starts_with("voicechat:") {
+    if channel != pv::CHANNEL {
         return false;
     }
-    voice().on_payload(channel, data);
+    voice().on_payload(data);
     true
 }
 
@@ -613,48 +616,54 @@ impl Voice {
         let Some(s) = self.session.as_ref() else {
             return ("Not on a server".into(), GREY);
         };
-        match &s.secret {
-            None if s.asked.len() >= s.plan(self.settings.protocol).len() => ("No voice chat on this server".into(), GREY),
-            None => ("Asking the server...".into(), YELLOW),
-            Some(secret) => {
-                let version = if secret.compat >= COMPAT_27 { "2.7" } else { "2.6.x" };
-                match &*self.shared.status.lock().unwrap() {
-                    Status::Connected => (format!("Connected (protocol {version})"), GREEN),
-                    Status::Failed(e) => (e.clone(), RED),
-                    _ => (self.connecting_line(), YELLOW),
-                }
-            }
+        if s.connection.is_none() {
+            return if s.info_count >= 4 {
+                ("No Plasmo Voice on this server".into(), GREY)
+            } else {
+                ("Asking the server...".into(), YELLOW)
+            };
+        }
+        match &*self.shared.status.lock().unwrap() {
+            Status::Connected if self.shared.aes.lock().unwrap().is_some() => ("Connected (Plasmo Voice)".into(), GREEN),
+            Status::Connected => ("Connected, waiting for the server's settings".into(), YELLOW),
+            Status::Failed(e) => (e.clone(), RED),
+            _ => (self.connecting_line(), YELLOW),
         }
     }
 
     fn view(&self, hotkeys: Vec<(String, String)>) -> ui::View {
         let session = self.session.as_ref();
-        let connected = session.is_some_and(|s| s.secret.is_some())
+        let connected = session.is_some_and(|s| s.connection.is_some())
             && *self.shared.status.lock().unwrap() == Status::Connected;
-        let mut groups: Vec<ui::GroupRow> = session
+        // The right side lists who has voice chat (Plasmo has no groups).
+        let mut players: Vec<ui::GroupRow> = session
             .map(|s| {
-                s.groups
+                s.players
                     .values()
-                    .filter(|g| !g.hidden || s.group == Some(g.id))
-                    .map(|g| ui::GroupRow {
-                        id: g.id,
-                        name: g.name.clone(),
-                        has_password: g.has_password,
-                        members: s.members(g.id),
-                        ours: s.group == Some(g.id),
+                    .map(|p| ui::GroupRow {
+                        id: p.id,
+                        name: p.nick.clone(),
+                        has_password: false,
+                        members: vec![if p.voice_disabled {
+                            "voice off".into()
+                        } else if p.mic_muted || p.muted {
+                            "muted".into()
+                        } else {
+                            "voice on".into()
+                        }],
+                        ours: false,
                     })
                     .collect()
             })
             .unwrap_or_default();
-        // Yours first, then by name.
-        groups.sort_by_key(|g| (!g.ours, g.name.to_lowercase()));
+        players.sort_by_key(|g| g.name.to_lowercase());
         ui::View {
             status: self.status_line(),
             settings: self.settings.clone(),
             level_db: self.shared.level(),
             connected,
-            groups_enabled: session.and_then(|s| s.secret.as_ref()).is_some_and(|s| s.groups),
-            groups,
+            groups_enabled: false,
+            groups: players,
             hotkeys,
         }
     }
@@ -663,9 +672,6 @@ impl Voice {
     fn menu_action(&mut self, action: ui::Action) {
         use ui::Action as A;
         let Some(action) = self.menu.act(action) else { return };
-        let group_name = |v: &Voice, id: u128| {
-            v.session.as_ref().and_then(|s| s.groups.get(&id)).map(|g| (g.name.clone(), g.has_password))
-        };
         match action {
             A::Mode => self.click(0),
             A::Mute => self.click(1),
@@ -682,54 +688,6 @@ impl Voice {
             A::Threshold(d) => {
                 self.settings.threshold = (self.settings.threshold + d).clamp(-80, 0);
                 self.save();
-            }
-            A::Join(id) => match group_name(self, id) {
-                Some((_, true)) => {
-                    self.menu.joining = Some(id);
-                    self.menu.join_password.clear();
-                    self.menu.focus = Some(ui::Field::JoinPassword);
-                }
-                Some((name, false)) => {
-                    self.send(proto::join_group(id, None));
-                    self.menu.say(format!("Joining {name}..."), false);
-                }
-                None => {}
-            },
-            A::JoinWithPassword => {
-                let Some(id) = self.menu.joining.take() else { return };
-                let password = std::mem::take(&mut self.menu.join_password);
-                self.menu.focus = None;
-                if password.is_empty() {
-                    self.menu.say("Type the group's password first", true);
-                    self.menu.joining = Some(id);
-                    self.menu.focus = Some(ui::Field::JoinPassword);
-                    return;
-                }
-                let name = group_name(self, id).map(|(n, _)| n).unwrap_or_default();
-                self.send(proto::join_group(id, Some(&password)));
-                self.menu.say(format!("Joining {name}..."), false);
-            }
-            A::Leave => {
-                self.send(proto::leave_group());
-                self.menu.say("Leaving the group...", false);
-            }
-            A::Create => {
-                let name = self.menu.name.trim().to_owned();
-                if name.is_empty() {
-                    self.menu.say("Type a name for the group", true);
-                    self.menu.focus = Some(ui::Field::Name);
-                    return;
-                }
-                if self.session.as_ref().is_none_or(|s| s.secret.is_none()) {
-                    self.menu.say("Voice chat isn't connected", true);
-                    return;
-                }
-                let password = std::mem::take(&mut self.menu.password);
-                let password = (!password.is_empty()).then_some(password);
-                self.send(proto::create_group(&name, password.as_deref(), self.menu.kind));
-                self.menu.name.clear();
-                self.menu.focus = None;
-                self.menu.say(format!("Creating {name}..."), false);
             }
             _ => {}
         }
@@ -839,7 +797,7 @@ pub fn hud(ptt_key: &str) -> Vec<Line> {
     let Some(session) = v.session.as_ref().filter(|_| v.settings.hud) else {
         return Vec::new();
     };
-    if session.secret.is_none() {
+    if session.connection.is_none() {
         return Vec::new();
     }
     let mut lines = Vec::new();
@@ -876,14 +834,6 @@ pub fn hud(ptt_key: &str) -> Vec<Line> {
             Mode::Voice => line(format!("Voice activation ({:.0} dB)", v.shared.level()), GREY),
         });
     }
-    if let Some(g) = session.group.and_then(|g| session.groups.get(&g)) {
-        lines.push(line(format!("Group: {}", g.name), GREEN));
-        let mut members = session.members(g.id);
-        members.retain(|m| *m != session.own_name());
-        if !members.is_empty() {
-            lines.push(line(format!("  with {}", members.join(", ")), GREY));
-        }
-    }
     let now = Instant::now();
     let mut talking: Vec<(String, bool)> = v
         .shared
@@ -893,7 +843,7 @@ pub fn hud(ptt_key: &str) -> Vec<Line> {
         .iter()
         .filter(|(_, (at, _))| now - *at < Duration::from_millis(300))
         .map(|(id, (_, whisper))| {
-            let name = session.states.get(id).map_or_else(|| "Someone".into(), |s| s.name.clone());
+            let name = session.name(id).unwrap_or_else(|| "Someone".into());
             (name, *whisper)
         })
         .collect();
@@ -906,22 +856,8 @@ pub fn hud(ptt_key: &str) -> Vec<Line> {
 
 /// The group names to draw above the players the camera sees, on a `size`
 /// screen.
-pub fn group_labels(camera: &labels::Camera, size: [f32; 2]) -> Vec<labels::Label> {
-    let v = voice();
-    let Some(session) = v.session.as_ref().filter(|s| v.settings.group_labels && s.secret.is_some()) else {
-        return Vec::new();
-    };
-    let players = v.shared.players.lock().unwrap();
-    let shown: Vec<([f64; 3], String, bool)> = players
-        .iter()
-        .filter_map(|(id, eye)| {
-            let group = session.states.get(id)?.group?;
-            // Hidden groups stay hidden, unless they are the player's own.
-            let g = session.groups.get(&group).filter(|g| !g.hidden || session.group == Some(group))?;
-            Some((*eye, g.name.clone(), session.group == Some(group)))
-        })
-        .collect();
-    labels::place(camera, size, &shown)
+pub fn group_labels(_camera: &labels::Camera, _size: [f32; 2]) -> Vec<labels::Label> {
+    Vec::new()
 }
 
 /// `key.keyboard.caps.lock` → `Caps Lock`.
@@ -950,9 +886,6 @@ const HELP: &[&str] = &[
     "/vc volume <player> <0-200> - one player's voice",
     "/vc gain <10-500> - the microphone's gain",
     "/vc threshold <-127-0> - the voice activation level, in dB",
-    "/vc groups - the server's groups",
-    "/vc join <group> [password], /vc leave",
-    "/vc create <name> [password] [normal|open|isolated]",
 ];
 
 /// `/vc …`, without the slash: the chat lines it answers, or None when the
@@ -1002,7 +935,7 @@ pub fn command(line: &str) -> Option<Vec<String>> {
                 return Some(out("Volume: 0 to 400"));
             };
             let id = v.session.as_ref().and_then(|s| {
-                s.states.values().find(|p| p.name.eq_ignore_ascii_case(name)).map(|p| p.uuid)
+                s.players.values().find(|p| p.nick.eq_ignore_ascii_case(name)).map(|p| p.id)
             });
             match id {
                 Some(id) => {
@@ -1028,63 +961,6 @@ pub fn command(line: &str) -> Option<Vec<String>> {
             }
             _ => out("Threshold: -127 to 0 dB"),
         },
-        ["groups"] => {
-            let Some(s) = v.session.as_ref().filter(|s| s.secret.is_some()) else {
-                return Some(out("Voice chat isn't connected"));
-            };
-            let mut groups: Vec<&Group> = s.groups.values().filter(|g| !g.hidden || s.group == Some(g.id)).collect();
-            groups.sort_by_key(|g| g.name.to_lowercase());
-            let lines: Vec<String> = groups
-                .into_iter()
-                .map(|g| {
-                    let members = s.members(g.id);
-                    format!(
-                        "{}{}{}: {}",
-                        g.name,
-                        if g.has_password { " (password)" } else { "" },
-                        if s.group == Some(g.id) { " (yours)" } else { "" },
-                        if members.is_empty() { "nobody".to_owned() } else { members.join(", ") }
-                    )
-                })
-                .collect();
-            if lines.is_empty() { out("No groups yet: /vc create <name>") } else { lines }
-        }
-        ["join", name, rest @ ..] => {
-            let found = v.session.as_ref().and_then(|s| {
-                s.groups.values().find(|g| g.name.eq_ignore_ascii_case(name)).map(|g| (g.id, g.has_password))
-            });
-            match found {
-                Some((id, has_password)) => {
-                    let password = rest.first().copied();
-                    if has_password && password.is_none() {
-                        return Some(vec![format!("{name} needs a password: /vc join {name} <password>")]);
-                    }
-                    v.send(proto::join_group(id, password));
-                    vec![format!("Joining {name}...")]
-                }
-                None => vec![format!("No group named {name}: /vc groups")],
-            }
-        }
-        ["leave"] => {
-            v.send(proto::leave_group());
-            out("Leaving the group...")
-        }
-        ["create", name, rest @ ..] => {
-            let (mut password, mut kind) = (None, 0i16);
-            for word in rest {
-                match *word {
-                    "normal" => kind = 0,
-                    "open" => kind = 1,
-                    "isolated" => kind = 2,
-                    p => password = Some(p),
-                }
-            }
-            if v.session.as_ref().is_none_or(|s| s.secret.is_none()) {
-                return Some(out("Voice chat isn't connected"));
-            }
-            v.send(proto::create_group(name, password, kind));
-            vec![format!("Creating the group {name}...")]
-        }
         _ => HELP.iter().map(|s| s.to_string()).collect(),
     })
 }
@@ -1095,17 +971,13 @@ impl Voice {
         let Some(s) = self.session.as_ref() else {
             return vec!["Not on a server".into()];
         };
-        match &s.secret {
-            None if s.asked.len() >= s.plan(self.settings.protocol).len() => {
-                out.push("This server has no Simple Voice Chat (or a version this client doesn't speak)".into())
-            }
-            None => out.push("Asking the server for voice chat...".into()),
-            Some(secret) => {
-                let version = if secret.compat >= COMPAT_27 { "2.7" } else { "2.6.x" };
+        match &s.connection {
+            None => out.push("This server hasn't connected Plasmo Voice (it may not have it)".into()),
+            Some((_, ip, port)) => {
+                let distance = self.shared.talk.lock().unwrap().as_ref().map_or(0, |t| t.distance);
                 out.push(format!(
-                    "Voice chat {:?} (protocol {version}, distance {:.0} blocks)",
-                    *self.shared.status.lock().unwrap(),
-                    secret.distance
+                    "Plasmo Voice {:?} (voice server {ip}:{port}, talking distance {distance} blocks)",
+                    *self.shared.status.lock().unwrap()
                 ));
             }
         }
@@ -1116,10 +988,9 @@ impl Voice {
             out.push(format!("Problem: {e}"));
         }
         let mut names: Vec<String> = s
-            .states
+            .players
             .values()
-            .filter(|p| !p.disconnected)
-            .map(|p| format!("{}{}", p.name, if p.disabled { " (off)" } else if p.muted { " (muted)" } else { "" }))
+            .map(|p| format!("{}{}", p.nick, if p.voice_disabled { " (off)" } else if p.mic_muted { " (muted)" } else { "" }))
             .collect();
         names.sort();
         if !names.is_empty() {
@@ -1137,22 +1008,13 @@ mod tests {
         World { address, listener: None, players: Vec::new(), redirect: |h, p| (h.to_owned(), p) }
     }
 
-    /// The tests share the one voice chat.
-    static SERIAL: Mutex<()> = Mutex::new(());
-
     #[test]
-    fn asks_for_the_secret_with_one_version() {
-        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    fn registers_the_channel_and_ignores_other_payloads() {
+        use_sound_card(false);
         let none = |_: &str| None;
         let t = tick(Some(world("play.example.net")), &none);
         assert_eq!(t.payloads[0].0, "minecraft:register");
-        assert!(t.payloads.iter().all(|(c, _)| c != "voicechat:request_secret"));
-        voice().session.as_mut().unwrap().next_ask = Instant::now();
-        let t = tick(Some(world("play.example.net")), &none);
-        assert_eq!(t.payloads, vec![("voicechat:request_secret".into(), 20i32.to_be_bytes().to_vec())]);
-        voice().session.as_mut().unwrap().next_ask = Instant::now();
-        let t = tick(Some(world("play.example.net")), &none);
-        assert_eq!(t.payloads[0].1, 20i32.to_be_bytes().to_vec());
+        assert_eq!(t.payloads[0].1, b"plasmo:voice/v2\0plasmo:voice/v2/service");
         assert!(!payload("minecraft:brand", b""));
         let t = tick(None, &none);
         assert!(t.payloads.is_empty());
@@ -1160,74 +1022,34 @@ mod tests {
     }
 
     #[test]
-    fn shows_other_players_groups() {
-        use buf::Writer;
-        let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        let none = |_: &str| None;
-        tick(None, &none);
-        let mut w = world("groups.example.net");
-        w.players = vec![(0xA, [0.0, 65.62, 10.0]), (0xB, [3.0, 65.62, 12.0])];
-        tick(Some(w), &none);
-        // As a 2.6 server sends them: a secret, the groups, then the states.
-        let mut secret = Writer::new();
-        secret.raw(&[1; 16]).i32(24454).uuid(0xC).u8(0).i32(1275);
-        secret.raw(&48f64.to_be_bytes()).i32(1000).bool(true).utf("127.0.0.1").bool(false);
-        {
-            let mut v = voice();
-            let s = v.session.as_mut().unwrap();
-            s.secret = Some(Secret::parse(&secret.finish()).unwrap());
-        }
-        for (id, name) in [(0x61u128, "Builders"), (0x62, "Miners")] {
-            let mut g = Writer::new();
-            g.uuid(id).utf(name).bool(false).bool(true).bool(false).i16(0);
-            assert!(payload("voicechat:add_group", &g.finish()));
-        }
-        let mut states = Writer::new();
-        states.i32(3);
-        for (id, name, group) in [(0xAu128, "Alex", 0x61u128), (0xB, "Bea", 0x62), (0xC, "Me", 0x61)] {
-            states.bool(false).bool(false).uuid(id).utf(name).bool(true).uuid(group);
-        }
-        assert!(payload("voicechat:states", &states.finish()));
-        let mut joined = Writer::new();
-        joined.bool(true).uuid(0x61).bool(false);
-        payload("voicechat:joined_group", &joined.finish());
-
-        let camera = labels::Camera { pos: [0.0, 65.62, 0.0], yaw: 0.0, pitch: 0.0, fov: 70.0 };
-        let shown = group_labels(&camera, [400.0, 200.0]);
-        let texts: Vec<_> = shown.iter().map(|l| (l.text.as_str(), l.rgb)).collect();
-        assert_eq!(texts, vec![("[Miners]", 0xFFFF55), ("[Builders]", 0x55FF55)]);
-        let list = command("vc groups").unwrap();
-        assert_eq!(list, vec!["Builders (yours): Alex, Me", "Miners: Bea"]);
-        let hud: Vec<String> = hud("key.keyboard.v").into_iter().map(|l| l.text).collect();
-        assert!(hud.contains(&"Group: Builders".to_owned()) && hud.contains(&"  with Alex".to_owned()), "{hud:?}");
-
-        // The menu: a password group asks for its password, then joins.
-        {
-            let mut v = voice();
-            let s = v.session.as_mut().unwrap();
-            s.groups.get_mut(&0x62).unwrap().has_password = true;
-        }
-        *voice().shared.status.lock().unwrap() = Status::Connected;
-        menu_open(Some('v'));
-        let measure = |t: &str| t.len() as f32 * 6.0;
-        let keys = vec![("Push to talk".to_owned(), key_label(DEFAULT_PTT))];
-        let draws = menu_draw([480.0, 270.0], [0.0, 0.0], &measure, keys.clone());
-        let has = |d: &[ui::Draw], want: &str| d.iter().any(|d| matches!(d, ui::Draw::Text(t, ..) if t == want));
-        assert!(has(&draws, "Caps Lock") && has(&draws, "Miners (password)") && has(&draws, "Alex, Me"));
-        let join = voice().menu.hit_rect(&ui::Action::Join(0x62)).unwrap();
-        tick(Some(world("groups.example.net")), &none);
-        menu_click([join[0] + 1.0, join[1] + 1.0]);
-        assert_eq!(voice().menu.joining, Some(0x62));
-        menu_char('v');
-        for c in "hunter2".chars() {
-            menu_char(c);
-        }
-        menu_key("key.keyboard.enter", false, DEFAULT_MENU);
-        let t = tick(Some(world("groups.example.net")), &none);
-        assert_eq!(t.payloads, vec![proto::join_group(0x62, Some("hunter2"))].into_iter().map(|(c, d)| (c.to_owned(), d)).collect::<Vec<_>>());
-        menu_key(DEFAULT_MENU, false, DEFAULT_MENU);
-        assert!(menu_take_close() && !menu_is_open());
-        tick(None, &none);
+    fn talks_with_the_proximity_activation() {
+        let codec = pv::Codec { name: "opus".into(), params: vec![("mode".into(), "VOIP".into()), ("bitrate".into(), "24000".into())] };
+        let proximity = pv::Activation {
+            id: pv::activation_id("proximity"),
+            name: "proximity".into(),
+            translation: String::new(),
+            distances: vec![8, 16, 32],
+            default_distance: 16,
+            proximity: true,
+            transitive: true,
+            stereo: false,
+            encoder: None,
+            weight: 0,
+        };
+        let config = pv::Config {
+            server_id: 1,
+            sample_rate: 48_000,
+            mtu: 1024,
+            encoder: Some(codec),
+            encryption: None,
+            lines: Vec::new(),
+            activations: vec![proximity],
+            permissions: Vec::new(),
+        };
+        let t = talk_from(&config).unwrap();
+        assert_eq!((t.distance, t.bitrate, t.opus_application), (16, 24_000, opus::APPLICATION_VOIP));
+        assert_eq!(split_host_port("play.minehouse.pro"), ("play.minehouse.pro".into(), 25565));
+        assert_eq!(split_host_port("1.2.3.4:25566"), ("1.2.3.4".into(), 25566));
     }
 
     #[test]
@@ -1235,12 +1057,10 @@ mod tests {
         let mut s = Settings::default();
         s.click(0);
         s.click(3);
-        s.click(6);
         let stored: HashMap<_, _> = s.stored().into_iter().collect();
         let back = Settings::load(&|k| stored.get(k).cloned());
         assert_eq!(back, s);
-        assert_eq!((back.mode, back.volume, back.protocol), (Mode::Voice, 125, Protocol::V26));
+        assert_eq!((back.mode, back.volume), (Mode::Voice, 125));
         assert_eq!(key_label("key.keyboard.caps.lock"), "Caps Lock");
-        assert_eq!(compat_key("Play.Example.net:25565"), "compat.play.example.net_25565");
     }
 }

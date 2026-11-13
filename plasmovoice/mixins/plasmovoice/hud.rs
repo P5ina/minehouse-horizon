@@ -7,7 +7,7 @@ fn voicechat_hud(
     corners: &mut horizon_client::extras_hud::Corners,
 ) {
     use horizon_client::extras::Corner;
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if !game.native_on(vc::ID) {
         return;
     }

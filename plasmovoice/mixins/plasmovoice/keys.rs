@@ -1,7 +1,7 @@
 // Keys over the voice chat menu are the menu's: typing, Tab, Enter, Escape,
 // and the menu key closes it again.
 fn voicechat_keys(game: &crate::game::Game<'_>, key: &str, modifiers: u32, canceled: &mut bool) {
-    use voicechat_engine as vc;
+    use plasmovoice_engine as vc;
     if game.native_mod_screen() != Some(vc::ID) {
         return;
     }
