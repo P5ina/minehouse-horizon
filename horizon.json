@@ -1,0 +1,6 @@
+{
+  "horizon_revision": "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0",
+  "horizon_nightly": "nightly-2026-11-13-9f42064",
+  "horizon_mixins_revision": "5a64af938ec86b00d53d16a408aabc0038fb3e57",
+  "mods": ["mods/pingwheel/mixins/pingwheel", "mods/plasmovoice/mixins/plasmovoice"]
+}
