@@ -13,6 +13,12 @@ def main():
     p.add_argument("--mixins", default="horizon-mixins", help="the horizon-mixins CLI")
     a = p.parse_args()
     cfg = json.loads((ROOT / "horizon.json").read_text())
+    # As the launcher's source archive: no links (horizon-mixins refuses them) and no .git.
+    shutil.rmtree(a.source / ".git", ignore_errors=True)
+    for path in list(a.source.rglob("*")):
+        if path.is_symlink():
+            path.unlink()
+    (a.source / ".horizon-revision").write_text(cfg["horizon_revision"] + "\n")
     mods = a.out.parent / "mods-incoming"
     shutil.rmtree(mods, ignore_errors=True)
     mods.mkdir(parents=True)

@@ -1,37 +1,21 @@
-// The ping key: mark the block the camera looks at for the players near you.
+// Ping Wheel's keys: Ping Location queues a ping for the next tick
+// (`InputUtils.consumePingHotkey`: bound to Pick Block, only when the crosshair
+// is on nothing pickable), Open Settings shows its settings, and the player
+// list key shows who pinged (Player Info: Hold).
 fn pingwheel_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
     use crate::game::pingwheel as m;
-    use horizon_client::mod_api::ServerboundPlayPacket as S;
-    use horizon_protocol::packets::configuration::CustomPayload;
-    if !pressed || !game.native_on(m::ID) || !game.native_playing() {
+    if !game.native_on(m::ID) {
         return;
     }
-    if key != game.native_mod_key(m::ID, m::KEY, m::DEFAULT_KEY) {
+    if key == m::PLAYER_LIST {
+        m::with(|s| s.player_list_held = pressed);
+    }
+    if !pressed || !game.native_playing() {
         return;
     }
-    let Some(cam) = game.native_camera() else {
-        return;
-    };
-    let dir = m::view_vector(cam.yaw, cam.pitch);
-    let Some(hit) = game.clip_ray_fluids(cam.position, dir, m::RAYCAST_DISTANCE, true) else {
-        if m::debug_on() {
-        game.native_chat(&format!("[pingwheel] {}", "ping: nothing under the crosshair"));
-    }
-        return;
-    };
-    let ping = m::Ping {
-        channel: String::new(),
-        pos: hit.point,
-        entity: None,
-        sequence: m::with(|s| s.next_sequence()),
-        dimension: m::dimension_hash(&cam.dimension),
-        author: None,
-    };
-    let sent = game.native_send_packet(S::CustomPayload(CustomPayload {
-        channel: m::C2S_PING.into(),
-        data: m::encode_ping(&ping),
-    }));
-    if m::debug_on() {
-        game.native_chat(&format!("[pingwheel] {}", &format!("ping at {:?}: {sent:?}", hit.point)));
+    if key == game.native_mod_key(m::ID, m::KEY_PING, m::DEFAULT_PING) {
+        m::with(|s| s.queued = true);
+    } else if key == game.native_mod_key(m::ID, m::KEY_SETTINGS, m::DEFAULT_SETTINGS) {
+        m::with(|s| s.open_settings = true);
     }
 }

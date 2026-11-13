@@ -1,4 +1,4 @@
-// A packet from the server: Ping Wheel's pings go on the screen.
+// A packet from the server: Ping Wheel's pings (`PingManager.acceptPingPacket`).
 fn pingwheel_packet(
     game: &mut crate::game::Game<'_>,
     packet: &horizon_client::mod_api::ClientboundPlayPacket,
@@ -14,10 +14,10 @@ fn pingwheel_packet(
     if payload.channel != m::S2C_PING {
         return;
     }
-    if m::debug_on() {
-        game.native_chat(&format!("[pingwheel] {}", "ping received"));
-    }
     let Some(ping) = m::decode_ping(&payload.data) else {
+        return;
+    };
+    let Some(me) = game.native_player() else {
         return;
     };
     let name = ping
@@ -28,5 +28,14 @@ fn pingwheel_packet(
                 .map(|p| p.name)
         })
         .unwrap_or_default();
-    m::with(|s| s.add(ping, name));
+    let (pos, dimension) = (ping.pos, ping.dimension);
+    let (accepted, volume) = m::with(|s| (s.accept(ping, name, [me.x, me.y, me.z]), s.config.ping_volume));
+    // `playSoundInDimension`: Ping Wheel's own sound, where the ping is.
+    let here = game.native_camera().map(|c| m::dimension_hash(&c.dimension));
+    if accepted && volume > 0 && here == Some(dimension) {
+        let pcm = horizon_client::native_data!("pingwheel", "ping.pcm");
+        let samples = m::ping_sound(pcm, volume as f32 / 100.0);
+        let source = (u128::from(pos[0].to_bits()) << 64) ^ u128::from(pos[2].to_bits());
+        game.native_push_voice(m::ID, source, &samples, 48_000, None);
+    }
 }
