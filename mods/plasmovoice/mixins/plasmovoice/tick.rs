@@ -24,12 +24,24 @@ fn voicechat_tick(game: &mut crate::game::Game<'_>) {
         eye: [p.x, p.y + vc::EYE_HEIGHT, p.z],
         yaw: p.yaw,
     });
+    let own = r.tab_players.values().find(|p| p.name == r.session.name).map(|p| p.uuid);
     let world = vc::World {
         address: &address,
         listener,
         players,
         redirect: horizon_protocol::server_redirect,
+        own,
     };
+    // Plasmo Voice's icons, once, into the mod image slot.
+    {
+        static UPLOADED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+        if !UPLOADED.load(std::sync::atomic::Ordering::Relaxed) {
+            let (w, h, px) = vc::icons::atlas();
+            if game.native_mod_image(w, h, &px) {
+                UPLOADED.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    }
     let done = {
         let game = &*game;
         vc::tick(Some(world), &|key| game.native_setting(vc::ID, key))

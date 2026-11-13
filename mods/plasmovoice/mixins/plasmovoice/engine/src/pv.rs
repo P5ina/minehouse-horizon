@@ -225,6 +225,7 @@ pub struct Activation {
     pub id: Uuid,
     pub name: String,
     pub translation: String,
+    pub icon: String,
     pub distances: Vec<i32>,
     pub default_distance: i32,
     pub proximity: bool,
@@ -253,7 +254,7 @@ pub fn line_id(name: &str) -> Uuid {
 fn read_activation(r: &mut In) -> R<Activation> {
     let name = r.utf()?;
     let translation = r.utf()?;
-    let _icon = r.utf()?;
+    let icon = r.utf()?;
     let n = r.len(64)?;
     let mut distances = Vec::with_capacity(n);
     for _ in 0..n {
@@ -265,6 +266,7 @@ fn read_activation(r: &mut In) -> R<Activation> {
         default_distance: valid_default_distance(&distances, default_distance),
         name,
         translation,
+        icon,
         distances,
         proximity: r.bool()?,
         transitive: r.bool()?,
@@ -289,22 +291,25 @@ pub fn valid_default_distance(distances: &[i32], default: i32) -> i32 {
 pub struct Line {
     pub id: Uuid,
     pub name: String,
+    pub translation: String,
+    pub icon: String,
     pub default_volume: f64,
+    pub weight: i32,
 }
 
 fn read_line(r: &mut In) -> R<Line> {
     let name = r.utf()?;
-    let _translation = r.utf()?;
-    let _icon = r.utf()?;
+    let translation = r.utf()?;
+    let icon = r.utf()?;
     let default_volume = r.f64()?;
-    let _weight = r.i32()?;
+    let weight = r.i32()?;
     if r.bool()? {
         let n = r.len(i16::MAX as usize)?;
         for _ in 0..n {
             read_profile(r)?;
         }
     }
-    Ok(Line { id: line_id(&name), name, default_volume })
+    Ok(Line { id: line_id(&name), name, translation, icon, default_volume, weight })
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -370,6 +375,9 @@ pub struct Config {
     pub lines: Vec<Line>,
     pub activations: Vec<Activation>,
     pub permissions: Vec<(String, bool)>,
+    /// `PlayerIconConfig`: which player icons the server hides, and where icons sit above heads.
+    pub icon_visibility: Vec<String>,
+    pub icon_offset: [f64; 3],
 }
 
 fn read_permissions(r: &mut In) -> R<Vec<(String, bool)>> {
@@ -405,8 +413,17 @@ fn read_config(r: &mut In) -> R<Config> {
         activations.push(read_activation(r)?);
     }
     let permissions = read_permissions(r)?;
-    // The player icon config follows; nothing here uses it.
-    Ok(Config { server_id, sample_rate, mtu, encoder, encryption, lines, activations, permissions })
+    // The player icon config, which older servers leave out.
+    let (icon_visibility, icon_offset) = (|| -> R<(Vec<String>, [f64; 3])> {
+        let n = r.len(5)?;
+        let mut v = Vec::with_capacity(n);
+        for _ in 0..n {
+            v.push(r.utf()?);
+        }
+        Ok((v, r.pos()?))
+    })()
+    .unwrap_or_default();
+    Ok(Config { server_id, sample_rate, mtu, encoder, encryption, lines, activations, permissions, icon_visibility, icon_offset })
 }
 
 // --- Game-connection packets ------------------------------------------------------

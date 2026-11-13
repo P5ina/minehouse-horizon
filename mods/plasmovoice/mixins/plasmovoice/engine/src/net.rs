@@ -70,6 +70,8 @@ pub enum Status {
 #[derive(Clone, Debug, PartialEq)]
 pub struct Talk {
     pub activation: Uuid,
+    /// The activation's HUD icon (`plasmovoice:textures/icons/microphone.png`).
+    pub icon: String,
     pub distance: i16,
     pub stereo: bool,
     pub opus_application: i32,
@@ -87,6 +89,10 @@ pub struct Shared {
     pub entities: Mutex<HashMap<i32, [f64; 3]>>,
     /// Who was heard last and when.
     pub talking: Mutex<HashMap<u128, (Instant, bool)>>,
+    /// The source line each speaker was last heard on, for its icon.
+    pub talking_line: Mutex<HashMap<u128, Uuid>>,
+    /// The UDP connection missed keep-alives for a while (Plasmo's soft timeout).
+    pub timed_out: AtomicBool,
     pub controls: Mutex<Controls>,
     pub status: Mutex<Status>,
     pub mic_error: Mutex<Option<String>>,
@@ -244,6 +250,7 @@ fn run(
             shared.tries.fetch_add(1, Ordering::Relaxed);
             let _ = socket.send(&pv::udp_ping(secret, now_ms(), Some((&host, target.port))));
         }
+        shared.timed_out.store(connected && now - keep_alive > Duration::from_secs(7), Ordering::Relaxed);
         if now - keep_alive > KEEP_ALIVE_TIMEOUT {
             break Err(if connected {
                 "the voice server stopped answering".into()
@@ -389,6 +396,7 @@ fn play(
         && gain.iter().any(|g| *g > 0.0)
     {
         shared.talking.lock().unwrap().insert(s, (now, false));
+        shared.talking_line.lock().unwrap().insert(s, info.line);
     }
 }
 

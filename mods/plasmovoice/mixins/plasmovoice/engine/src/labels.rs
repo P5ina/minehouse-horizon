@@ -112,3 +112,27 @@ mod tests {
         assert!((labels[0].at[0] - 200.0).abs() < 0.01 && labels[0].at[1] < 100.0);
     }
 }
+
+/// Where `world` lands on a `size` screen (GUI pixels) for a camera at `camera`
+/// with camera-relative `view` and `projection` matrices (column-major); None behind it.
+pub fn project_matrix(
+    world: [f64; 3],
+    camera: [f64; 3],
+    view: &[f32; 16],
+    projection: &[f32; 16],
+    size: (f32, f32),
+) -> Option<[f32; 2]> {
+    let mul = |m: &[f32; 16], v: [f32; 4]| {
+        let mut o = [0.0f32; 4];
+        for (row, o) in o.iter_mut().enumerate() {
+            *o = (0..4).map(|c| m[c * 4 + row] * v[c]).sum();
+        }
+        o
+    };
+    let rel = [(world[0] - camera[0]) as f32, (world[1] - camera[1]) as f32, (world[2] - camera[2]) as f32, 1.0];
+    let clip = mul(projection, mul(view, rel));
+    if clip[3] <= 1e-4 {
+        return None;
+    }
+    Some([(clip[0] / clip[3] + 1.0) * 0.5 * size.0, (1.0 - clip[1] / clip[3]) * 0.5 * size.1])
+}

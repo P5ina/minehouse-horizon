@@ -15,6 +15,7 @@ pub mod opus;
 pub mod pv;
 pub mod pvcrypt;
 pub mod ui;
+pub mod icons;
 
 use audio::{AudioIo, Devices, MicQueue};
 use mix::{Listener, Mixer};
@@ -30,26 +31,25 @@ pub const ID: &str = "plasmovoice";
 pub const NAME: &str = "Plasmo Voice";
 pub const VERSION: &str = "0.1.0";
 pub const DESCRIPTION: &str = "Talk with players who use the Plasmo Voice mod, on servers that have it (unofficial). \
-V opens the menu. Push to talk (Caps Lock) or voice activation.";
+V opens the menu. Push to talk (Left Alt) or voice activation.";
 
 pub const KEY_PTT: &str = "push_to_talk";
 pub const KEY_WHISPER: &str = "whisper";
 pub const KEY_MUTE: &str = "mute";
 pub const KEY_DISABLE: &str = "disable";
-pub const DEFAULT_PTT: &str = "key.keyboard.caps.lock";
+pub const DEFAULT_PTT: &str = "key.keyboard.left.alt";
 pub const DEFAULT_WHISPER: &str = "key.keyboard.unknown";
-pub const DEFAULT_MUTE: &str = "key.keyboard.j";
-pub const DEFAULT_DISABLE: &str = "key.keyboard.k";
+pub const DEFAULT_MUTE: &str = "key.keyboard.m";
+pub const DEFAULT_DISABLE: &str = "key.keyboard.unknown";
 pub const KEY_MENU: &str = "menu";
 pub const DEFAULT_MENU: &str = "key.keyboard.v";
 
 /// The mod's keys: their name, what they do, and their default.
-pub const HOTKEYS: [(&str, &str, &str); 5] = [
-    (KEY_MENU, "Open this menu", DEFAULT_MENU),
-    (KEY_PTT, "Push to talk", DEFAULT_PTT),
-    (KEY_WHISPER, "Whisper", DEFAULT_WHISPER),
+pub const HOTKEYS: [(&str, &str, &str); 4] = [
+    (KEY_MENU, "Plasmo Voice settings", DEFAULT_MENU),
+    (KEY_PTT, "Proximity: push to talk", DEFAULT_PTT),
     (KEY_MUTE, "Mute microphone", DEFAULT_MUTE),
-    (KEY_DISABLE, "Voice chat off / on", DEFAULT_DISABLE),
+    (KEY_DISABLE, "Disable voice chat", DEFAULT_DISABLE),
 ];
 
 /// A player's eyes above their feet (`Player.getEyeHeight`, standing).
@@ -63,6 +63,8 @@ pub struct World<'a> {
     /// Other players by UUID, at their eyes.
     pub players: Vec<(u128, [f64; 3])>,
     pub redirect: Redirect,
+    /// This player's UUID, when the game knows it.
+    pub own: Option<u128>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -102,7 +104,7 @@ impl Default for Settings {
             disabled: false,
             volume: 100,
             mic_gain: 100,
-            threshold: -50,
+            threshold: -30,
             protocol: Protocol::Auto,
             hud: true,
             group_labels: true,
@@ -214,6 +216,8 @@ struct Session {
     conn: Option<Conn>,
     audio: Option<AudioIo>,
     players: HashMap<Uuid, PlayerInfo>,
+    /// This player's UUID (`SelfSourceInfo`'s player, else the one the game gives).
+    own: Option<Uuid>,
 }
 
 impl Session {
@@ -228,6 +232,7 @@ impl Session {
             conn: None,
             audio: None,
             players: HashMap::new(),
+            own: None,
         }
     }
 
@@ -337,6 +342,7 @@ fn talk_from(config: &pv::Config) -> Option<Talk> {
     let codec = a.encoder.as_ref().or(config.encoder.as_ref());
     Some(Talk {
         activation: a.id,
+        icon: a.icon.clone(),
         distance: a.default_distance.clamp(1, i32::from(i16::MAX)) as i16,
         stereo: false,
         opus_application: opus_application(codec.and_then(|c| c.param("mode"))),
@@ -462,6 +468,11 @@ impl Voice {
             Tcp::SourceInfo(source) => {
                 self.shared.sources.lock().unwrap().insert(source.id, source);
             }
+            Tcp::SelfSourceInfo { player, .. } => {
+                if let Some(s) = self.session.as_mut() {
+                    s.own = Some(player);
+                }
+            }
             Tcp::SourceAudioEnd { source, .. } => net::end_source(source, &self.shared, &self.mixer),
             Tcp::ActivationRegister(a) if a.id == pv::activation_id("proximity") => {
                 if let Some(t) = self.shared.talk.lock().unwrap().as_mut() {
@@ -489,6 +500,11 @@ impl Voice {
         }
         if let Some(l) = world.listener {
             *self.shared.listener.lock().unwrap() = l;
+        }
+        if world.own.is_some()
+            && let Some(s) = self.session.as_mut()
+        {
+            s.own = world.own;
         }
         *self.shared.players.lock().unwrap() = world.players.into_iter().collect();
 
@@ -860,6 +876,106 @@ pub fn group_labels(_camera: &labels::Camera, _size: [f32; 2]) -> Vec<labels::La
     Vec::new()
 }
 
+/// The activation icon for the HUD (`HudIconRenderer`): the connection's or the
+/// microphone's state, else the activation while talking; None for nothing.
+pub fn hud_icon() -> Option<&'static str> {
+    let v = voice();
+    let session = v.session.as_ref()?;
+    session.connection.as_ref()?;
+    if *v.shared.status.lock().unwrap() != Status::Connected {
+        return None;
+    }
+    if v.shared.timed_out.load(Ordering::Relaxed) {
+        return Some("microphone_disconnected");
+    }
+    if v.settings.disabled {
+        return Some("speaker_disabled");
+    }
+    let own = session.players.values().find(|p| Some(p.id) == session.own).map(|p| p.muted).unwrap_or(false);
+    if own {
+        return Some("microphone_muted");
+    }
+    if v.settings.muted {
+        return Some("microphone_disabled");
+    }
+    if v.shared.transmitting.load(Ordering::Relaxed) {
+        let icon = v.shared.talk.lock().unwrap().as_ref().map(|t| t.icon.clone()).unwrap_or_default();
+        return Some(icons::name_of(&icon).unwrap_or("microphone"));
+    }
+    None
+}
+
+/// The icon above a player's head (`EntityIconStateExtractor.getPlayerIcon`):
+/// not installed, muted by us, muted by the server, voice chat off, else the
+/// source line they are heard on while they talk.
+pub fn player_icon(player: u128) -> Option<&'static str> {
+    let v = voice();
+    let session = v.session.as_ref()?;
+    session.connection.as_ref()?;
+    if *v.shared.status.lock().unwrap() != Status::Connected || Some(player) == session.own {
+        return None;
+    }
+    let hidden = |what: &str| session.config.as_ref().is_some_and(|c| c.icon_visibility.iter().any(|h| h == what));
+    let Some(info) = session.players.get(&player) else {
+        return (!hidden("HIDE_NOT_INSTALLED")).then_some("headset_not_installed");
+    };
+    let client_muted = v.shared.controls.lock().unwrap().player_volumes.get(&player).is_some_and(|&g| g == 0.0);
+    if client_muted {
+        return (!hidden("HIDE_CLIENT_MUTED")).then_some("speaker_disabled");
+    }
+    if info.muted {
+        return (!hidden("HIDE_SERVER_MUTED")).then_some("speaker_muted");
+    }
+    if info.voice_disabled {
+        return (!hidden("HIDE_VOICE_CHAT_DISABLED")).then_some("headset_disabled");
+    }
+    if hidden("HIDE_SOURCE_ICON") {
+        return None;
+    }
+    let talking = v.shared.talking.lock().unwrap().get(&player).is_some_and(|(at, _)| at.elapsed() < Duration::from_millis(300));
+    if !talking {
+        return None;
+    }
+    let line = v.shared.talking_line.lock().unwrap().get(&player).copied();
+    let icon = line
+        .and_then(|l| session.config.as_ref()?.lines.iter().find(|x| x.id == l).map(|x| x.icon.clone()))
+        .unwrap_or_default();
+    Some(icons::name_of(&icon).unwrap_or("speaker"))
+}
+
+/// Where player icons sit above the name tag, from the server's config.
+pub fn icon_offset() -> [f64; 3] {
+    voice().session.as_ref().and_then(|s| s.config.as_ref()).map_or([0.0; 3], |c| c.icon_offset)
+}
+
+/// The overlay (`OverlayRenderer`): who is talking now, by name, with their line's icon.
+pub fn overlay() -> Vec<(String, &'static str)> {
+    let v = voice();
+    let Some(session) = v.session.as_ref().filter(|s| s.connection.is_some()) else {
+        return Vec::new();
+    };
+    let talking = v.shared.talking.lock().unwrap();
+    let lines = v.shared.talking_line.lock().unwrap();
+    let mut out: Vec<(String, &'static str)> = talking
+        .iter()
+        .filter(|(_, (at, _))| at.elapsed() < Duration::from_millis(300))
+        .map(|(id, _)| {
+            let icon = lines
+                .get(id)
+                .and_then(|l| session.config.as_ref()?.lines.iter().find(|x| x.id == *l).map(|x| x.icon.clone()))
+                .unwrap_or_default();
+            (session.name(id).unwrap_or_else(|| "?".into()), icons::name_of(&icon).unwrap_or("speaker"))
+        })
+        .collect();
+    if v.shared.transmitting.load(Ordering::Relaxed)
+        && let Some(own) = session.own.and_then(|o| session.name(&o))
+    {
+        out.push((own, "microphone"));
+    }
+    out.sort();
+    out
+}
+
 /// `key.keyboard.caps.lock` → `Caps Lock`.
 pub fn key_label(key: &str) -> String {
     let name = key.strip_prefix("key.keyboard.").or_else(|| key.strip_prefix("key.mouse.")).unwrap_or(key);
@@ -1005,7 +1121,7 @@ mod tests {
     use super::*;
 
     fn world(address: &str) -> World<'_> {
-        World { address, listener: None, players: Vec::new(), redirect: |h, p| (h.to_owned(), p) }
+        World { address, listener: None, players: Vec::new(), redirect: |h, p| (h.to_owned(), p), own: None }
     }
 
     #[test]
@@ -1028,6 +1144,7 @@ mod tests {
             id: pv::activation_id("proximity"),
             name: "proximity".into(),
             translation: String::new(),
+            icon: "plasmovoice:textures/icons/microphone.png".into(),
             distances: vec![8, 16, 32],
             default_distance: 16,
             proximity: true,
@@ -1045,6 +1162,8 @@ mod tests {
             lines: Vec::new(),
             activations: vec![proximity],
             permissions: Vec::new(),
+            icon_visibility: Vec::new(),
+            icon_offset: [0.0; 3],
         };
         let t = talk_from(&config).unwrap();
         assert_eq!((t.distance, t.bitrate, t.opus_application), (16, 24_000, opus::APPLICATION_VOIP));
