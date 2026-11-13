@@ -14,6 +14,9 @@ fn pingwheel_packet(
     if payload.channel != m::S2C_PING {
         return;
     }
+    if m::debug_on() {
+        game.native_chat(&format!("[pingwheel] {}", "ping received"));
+    }
     let Some(ping) = m::decode_ping(&payload.data) else {
         return;
     };

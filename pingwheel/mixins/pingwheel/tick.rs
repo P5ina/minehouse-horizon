@@ -25,9 +25,13 @@ fn pingwheel_tick(game: &mut crate::game::Game<'_>) {
             data: m::encode_channel(""),
         });
         // Not joined yet (single player, a reconfiguring server): try next tick.
-        if game.native_send_packet(register).is_ok() {
+        let sent = game.native_send_packet(register);
+        if sent.is_ok() {
             let _ = game.native_send_packet(channel);
             m::with(|s| s.registered = true);
+            if m::debug_on() {
+        game.native_chat(&format!("[pingwheel] {}", "registered ping-wheel channels"));
+    }
         }
     }
     m::with(|s| s.tick());

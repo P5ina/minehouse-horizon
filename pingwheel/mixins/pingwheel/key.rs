@@ -14,6 +14,9 @@ fn pingwheel_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
     };
     let dir = m::view_vector(cam.yaw, cam.pitch);
     let Some(hit) = game.clip_ray_fluids(cam.position, dir, m::RAYCAST_DISTANCE, true) else {
+        if m::debug_on() {
+        game.native_chat(&format!("[pingwheel] {}", "ping: nothing under the crosshair"));
+    }
         return;
     };
     let ping = m::Ping {
@@ -24,8 +27,11 @@ fn pingwheel_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
         dimension: m::dimension_hash(&cam.dimension),
         author: None,
     };
-    let _ = game.native_send_packet(S::CustomPayload(CustomPayload {
+    let sent = game.native_send_packet(S::CustomPayload(CustomPayload {
         channel: m::C2S_PING.into(),
         data: m::encode_ping(&ping),
     }));
+    if m::debug_on() {
+        game.native_chat(&format!("[pingwheel] {}", &format!("ping at {:?}: {sent:?}", hit.point)));
+    }
 }

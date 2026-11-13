@@ -163,6 +163,11 @@ pub fn decode_ping(data: &[u8]) -> Option<Ping> {
     })
 }
 
+/// Diagnostics in chat while `PINGWHEEL_DEBUG` is set.
+pub fn debug_on() -> bool {
+    std::env::var_os("PINGWHEEL_DEBUG").is_some()
+}
+
 // --- State ------------------------------------------------------------------
 
 #[derive(Clone, Debug)]
