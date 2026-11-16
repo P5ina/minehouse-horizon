@@ -1,0 +1,34 @@
+[mod]
+id = "chatheads"
+version = "1.3.2"
+priority = 100
+
+[compatibility]
+horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "chatheads"
+source = "runtime.rs"
+
+[[injection]]
+id = "chat"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_client_chat_received"
+helper = "chat.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "overlay", ty = "bool", value = "overlay" },
+  { name = "sender", ty = "u128", value = "sender" },
+  { name = "message", ty = "&mut horizon_client::text::Text", value = "&mut *message" },
+]
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]

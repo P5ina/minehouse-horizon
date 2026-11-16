@@ -1,0 +1,10 @@
+[package]
+name = "horizon-mod-chatheads"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Chat Heads for Horizon: the sender's head beside chat messages."
+
+[lib]
+path = "mixins/chatheads/runtime.rs"

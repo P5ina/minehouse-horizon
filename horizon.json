@@ -5,6 +5,8 @@
   "mods": [
     "mods/pingwheel/mixins/pingwheel",
     "mods/plasmovoice/mixins/plasmovoice",
-    "mods/minehouse/mixins/minehouse"
+    "mods/minehouse/mixins/minehouse",
+    "mods/appleskin/mixins/appleskin",
+    "mods/chatheads/mixins/chatheads"
   ]
 }

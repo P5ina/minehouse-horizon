@@ -1,0 +1,77 @@
+[mod]
+id = "appleskin"
+version = "3.0.10"
+priority = 100
+
+[compatibility]
+horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "appleskin"
+source = "runtime.rs"
+
+[[injection]]
+id = "packet"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_client_packet"
+helper = "packet.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "packet", ty = "&horizon_client::mod_api::ClientboundPlayPacket", value = "packet" },
+]
+
+[[injection]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_client_tick_post"
+helper = "tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "hud"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_health_hud"
+helper = "hud.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "inputs", ty = "&horizon_client::hud_layout::HealthInputs", value = "inputs" },
+  { name = "wi", ty = "i32", value = "wi" },
+  { name = "hi", ty = "i32", value = "hi" },
+  { name = "draws", ty = "&mut Option<Vec<horizon_client::hud_layout::GuiDraw>>", value = "&mut *draws" },
+]
+
+[[injection]]
+id = "tooltip-size"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component"
+helper = "tooltip_size.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack" },
+  { name = "size", ty = "&mut Option<[f32; 2]>", value = "&mut *size" },
+]
+
+[[injection]]
+id = "tooltip-draw"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component_draw"
+helper = "tooltip_draw.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "origin", ty = "[f32; 2]", value = "origin" },
+]
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
