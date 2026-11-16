@@ -27,6 +27,7 @@ jobs:
       - name: Mods' own tests
         run: |
           cargo test --manifest-path mods/pingwheel/Cargo.toml
+          cargo test --manifest-path mods/minehouse/Cargo.toml
           cargo test --manifest-path mods/plasmovoice/mixins/plasmovoice/engine/Cargo.toml --release
 
   build:
