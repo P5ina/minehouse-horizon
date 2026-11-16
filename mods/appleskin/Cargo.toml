@@ -1,0 +1,10 @@
+[package]
+name = "horizon-mod-appleskin"
+version = "0.1.0"
+edition = "2024"
+license = "Unlicense"
+publish = false
+description = "AppleSkin for Horizon: food HUD improvements compatible with the AppleSkin server mod."
+
+[lib]
+path = "mixins/appleskin/runtime.rs"

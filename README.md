@@ -8,6 +8,9 @@ the MineHouse launcher and never compile anything.
 |---|---|---|
 | Ping Wheel | `mods/pingwheel` | the server's Ping Wheel 1.12 (Fabric) |
 | Plasmo Voice | `mods/plasmovoice` | the server's Plasmo Voice 2.1.x |
+| AppleSkin | `mods/appleskin` | the server's AppleSkin 3.0 (saturation, exhaustion) |
+| Chat Heads | `mods/chatheads` | nothing: client only |
+| MineHouse | `mods/minehouse` | MineHouse's server mods: the anvil's real cost, the spawn zones' borders |
 
 - `horizon.json` pins the Horizon commit (and the Nightly whose files the build reuses) and horizon-mixins.
 - `.github/workflows/build.yml` applies the mods with horizon-mixins (`tools/stage.py`) and compiles

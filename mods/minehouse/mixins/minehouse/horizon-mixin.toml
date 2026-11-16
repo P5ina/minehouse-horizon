@@ -1,0 +1,86 @@
+[mod]
+id = "minehouse"
+version = "0.1.0"
+priority = 100
+
+[compatibility]
+horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+
+[[module]]
+id = "runtime"
+file = "crates/horizon-client/src/game.rs"
+name = "minehouse"
+source = "runtime.rs"
+
+[[injection]]
+id = "packet"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_client_packet"
+helper = "packet.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+  { name = "packet", ty = "&horizon_client::mod_api::ClientboundPlayPacket", value = "packet" },
+]
+
+[[injection]]
+id = "tick"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_client_tick_post"
+helper = "tick.rs"
+bindings = [
+  { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
+]
+
+[[injection]]
+id = "zones"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_world_primitives"
+helper = "zones.rs"
+bindings = [
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+  { name = "primitives", ty = "&mut horizon_client::world_primitives::WorldPrimitives", value = "&mut *primitives" },
+]
+
+[[injection]]
+id = "list"
+kind = "HEAD"
+target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+helper = "list.rs"
+bindings = [
+  { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+# The anvil screen (`AnvilScreen.extractLabels`): the real cost in place of the
+# 39 the server puts in the data slot...
+[[injection]]
+id = "anvil-cost"
+kind = "MODIFY_VARIABLE"
+target = "horizon_client::game::stations::Game<'_>::draw_station"
+variable = { name = "cost", ordinal = 1, at = "STORE" }
+require = 1
+ordinal = 0
+helper = "anvil_cost.rs"
+bindings = [{ name = "value", ty = "i32", value = "$value" }]
+
+# ...no "Too Expensive!" while it does (the server has no such limit): the
+# `cost >= 40` test reads the clamp instead of the real cost...
+[[injection]]
+id = "anvil-limit"
+kind = "MODIFY_VARIABLE"
+target = "horizon_client::game::stations::Game<'_>::draw_station"
+variable = { name = "cost", ordinal = 1, at = "LOAD" }
+require = 3
+ordinal = 1
+helper = "anvil_limit.rs"
+bindings = [{ name = "value", ty = "i32", value = "$value" }]
+
+# ...and red when the player hasn't the levels for the real cost.
+[[injection]]
+id = "anvil-take"
+kind = "RETURN"
+target = "horizon_client::game::stations::Game<'_>::may_take_result"
+helper = "anvil_take.rs"
+bindings = [
+  { name = "value", ty = "bool", value = "$value" },
+  { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+]
