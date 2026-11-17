@@ -17,7 +17,7 @@ the MineHouse launcher and never compile anything.
 | Minimap (official) | `mods/minimap` | nothing: client only; Horizon's own mod from horizon-rust/horizon-mods, MIT |
 | Zoom (official) | `mods/zoom` | nothing: client only; Horizon's own mod from horizon-rust/horizon-mods, MIT |
 | Controlling | `mods/controlling` | nothing: client only (Key Binds search) |
-| MineHouse | `mods/minehouse` | MineHouse's server mods: the anvil's real cost, the spawn zones' borders |
+| MineHouse | `mods/minehouse` | MineHouse's server mods: the wardrobe (O), the anvil's real cost, the spawn zones' borders |
 
 - `horizon.json` pins the Horizon commit (and the Nightly whose files the build reuses) and horizon-mixins.
 - `.github/workflows/build.yml` applies the mods with horizon-mixins (`tools/stage.py`) and compiles
