@@ -4,6 +4,7 @@
 //! Written for Horizon; the file format is Litematica's.
 pub mod nbt;
 pub mod schematic;
+pub mod sync;
 
 use schematic::{Layout, Mirror, Schematic, State, Transform};
 use std::cell::RefCell;
@@ -61,7 +62,12 @@ pub struct Placement {
     /// Each of `layout.states` as the game's block state id, once resolved.
     pub ids: Vec<Option<u32>>,
     pub resolved: bool,
+    /// Drawn: in the dimension it belongs to.
     pub shown: bool,
+    /// The dimension it was placed in, when known (shared ones).
+    pub dimension: Option<String>,
+    /// The Syncmatica placement it follows, while on that server.
+    pub shared: Option<[u8; 16]>,
 }
 impl Placement {
     pub fn new(file: String, schematic: Schematic, t: Transform) -> Self {
@@ -74,6 +80,8 @@ impl Placement {
             ids: Vec::new(),
             resolved: false,
             shown: true,
+            dimension: None,
+            shared: None,
         };
         p.relayout();
         p
@@ -104,6 +112,10 @@ pub struct Mod {
     pub world: Option<String>,
     /// Placements to save (`take_save`).
     pub save: bool,
+    /// Syncmatica on the server joined.
+    pub sync: sync::Sync,
+    /// The shared placement to place once downloaded.
+    pub wanted: Option<[u8; 16]>,
 }
 thread_local! {
     static MOD: RefCell<Mod> = RefCell::new(Mod::default());
@@ -216,6 +228,7 @@ impl Mod {
                     ("select <n>", "choose a placement", "выбрать схему"),
                     ("unload [all]", "remove it", "убрать схему"),
                     ("info", "the placements", "список поставленных"),
+                    ("shared [n]", "schematics shared on the server (Syncmatica)", "схемы, выложенные на сервер (Syncmatica)"),
                 ] {
                     out.push(format!("§e/lm {cmd}§r — {}", if ru { rus } else { en }));
                 }
@@ -434,9 +447,203 @@ impl Mod {
                     }
                 }
             }
+            "shared" | "sync" | "syncmatica" => return self.shared_command(args.get(1).copied(), ctx),
             other => return Err(t(ru, &format!("Unknown: {other}. /lm help"), &format!("Не знаю «{other}». /lm help"))),
         }
         Ok(out)
+    }
+}
+
+/// Where a shared placement's file is kept, under the schematics folder
+/// (without `.litematic`): its name and the start of its hash.
+pub fn shared_file(s: &sync::Shared) -> String {
+    let base = if s.name.trim().is_empty() { s.file.trim_end_matches(".litematic") } else { s.name.as_str() };
+    let clean: String = base
+        .chars()
+        .map(|c| if c.is_alphanumeric() || matches!(c, ' ' | '-' | '_' | '.') { c } else { '_' })
+        .take(64)
+        .collect();
+    let h: String = s.hash[..4].iter().map(|b| format!("{b:02x}")).collect();
+    format!("syncmatica/{}-{h}", clean.trim().trim_start_matches('.'))
+}
+
+/// A shared placement's origin, rotation and mirror.
+pub fn shared_transform(s: &sync::Shared) -> Transform {
+    Transform {
+        origin: s.pos,
+        rotation: s.rotation & 3,
+        mirror: match s.mirror {
+            1 => Mirror::LeftRight,
+            2 => Mirror::FrontBack,
+            _ => Mirror::None,
+        },
+    }
+}
+
+fn shared_title(s: &sync::Shared) -> &str {
+    if s.name.trim().is_empty() { &s.file } else { &s.name }
+}
+
+impl Mod {
+    fn shared_command(&mut self, arg: Option<&str>, ctx: &Ctx<'_>) -> Result<Vec<String>, String> {
+        let ru = ctx.russian;
+        if !self.sync.joined {
+            return Err(t(ru, "This server has no Syncmatica", "На этом сервере нет Syncmatica"));
+        }
+        let Some(arg) = arg else {
+            let mut out = Vec::new();
+            if self.sync.shared.is_empty() {
+                out.push(t(ru, "Nothing is shared on the server", "На сервер ничего не выложено"));
+            } else {
+                out.push(t(ru, "Shared on the server (/lm shared <n> places one):", "Выложено на сервер (/lm shared <n> — поставить):"));
+            }
+            for (i, s) in self.sync.shared.iter().enumerate().take(40) {
+                let placed = self.placements.iter().any(|p| p.shared == Some(s.id));
+                out.push(format!(
+                    " {}{}. §b{}§r {} {} {} §7{}{}{}",
+                    if placed { "§a" } else { "" },
+                    i + 1,
+                    shared_title(s),
+                    s.pos[0],
+                    s.pos[1],
+                    s.pos[2],
+                    s.dimension.trim_start_matches("minecraft:"),
+                    if s.owner.is_empty() { String::new() } else { format!(", {}", s.owner) },
+                    if placed { t(ru, ", placed", ", стоит") } else { String::new() },
+                ));
+            }
+            if let Some((id, n)) = self.sync.downloading() {
+                if let Some(s) = self.sync.get(id) {
+                    out.push(t(ru, &format!("Downloading {}: {} KB", shared_title(s), n >> 10), &format!("Скачивается {}: {} КБ", shared_title(s), n >> 10)));
+                }
+            }
+            return Ok(out);
+        };
+        let n = arg.parse::<usize>().ok().filter(|&n| n >= 1 && n <= self.sync.shared.len()).ok_or_else(|| {
+            t(ru, &format!("/lm shared <1..{}>", self.sync.shared.len()), &format!("/lm shared <1..{}>", self.sync.shared.len()))
+        })?;
+        let s = self.sync.shared[n - 1].clone();
+        if let Some(i) = self.placements.iter().position(|p| p.shared == Some(s.id)) {
+            self.selected = i;
+            self.hidden = false;
+            return Ok(vec![t(ru, &format!("{} is already placed; selected it", shared_title(&s)), &format!("{} уже стоит; выбрана", shared_title(&s)))]);
+        }
+        // Downloaded before: the same file, by its hash.
+        let path = ctx.dir.join(format!("{}.litematic", shared_file(&s)));
+        if let Ok(bytes) = std::fs::read(&path) {
+            if sync::file_hash(&bytes) == s.hash {
+                return Ok(vec![self.place_shared(&s, &bytes, ru)?]);
+            }
+        }
+        self.wanted = Some(s.id);
+        self.sync.request(s.id);
+        Ok(vec![t(ru, &format!("Downloading {}…", shared_title(&s)), &format!("Скачиваю {}…", shared_title(&s)))])
+    }
+
+    fn place_shared(&mut self, s: &sync::Shared, bytes: &[u8], ru: bool) -> Result<String, String> {
+        let schematic = schematic::parse(bytes)?;
+        let mut p = Placement::new(shared_file(s), schematic, shared_transform(s));
+        p.dimension = Some(s.dimension.clone());
+        p.shared = Some(s.id);
+        let count = p.layout.blocks.len();
+        self.placements.push(p);
+        self.selected = self.placements.len() - 1;
+        self.hidden = false;
+        self.save = true;
+        let o = s.pos;
+        Ok(t(
+            ru,
+            &format!("Placed §b{}§r at {} {} {} as on the server: {count} blocks", shared_title(s), o[0], o[1], o[2]),
+            &format!("Схема §b{}§r поставлена у {} {} {}, как на сервере: блоков: {count}", shared_title(s), o[0], o[1], o[2]),
+        ))
+    }
+
+    /// Follows what Syncmatica said: places a download, moves the
+    /// placements that follow a moved one. Returns the lines for the chat.
+    pub fn sync_events(&mut self, events: Vec<sync::Event>, dir: &Path, ru: bool) -> Vec<String> {
+        use sync::Event;
+        let mut out = Vec::new();
+        for e in events {
+            match e {
+                Event::Joined => {
+                    // Placed here before: follow them again.
+                    let shared = self.sync.shared.clone();
+                    for p in &mut self.placements {
+                        if let Some(s) = shared.iter().find(|s| shared_file(s) == p.file) {
+                            p.shared = Some(s.id);
+                            if p.t != shared_transform(s) {
+                                p.t = shared_transform(s);
+                                p.relayout();
+                                self.save = true;
+                            }
+                            p.dimension = Some(s.dimension.clone());
+                        }
+                    }
+                    if !shared.is_empty() {
+                        out.push(t(
+                            ru,
+                            &format!("§6Syncmatica§r: {} shared on the server, /lm shared", shared.len()),
+                            &format!("§6Syncmatica§r: схем на сервере: {}, /lm shared", shared.len()),
+                        ));
+                    }
+                }
+                Event::Added { id } => {
+                    if let Some((n, s)) = self.sync.shared.iter().enumerate().find(|(_, s)| s.id == id) {
+                        let who = if s.owner.is_empty() { "?" } else { s.owner.as_str() };
+                        out.push(t(
+                            ru,
+                            &format!("§6Syncmatica§r: {who} shared §b{}§r, /lm shared {}", shared_title(s), n + 1),
+                            &format!("§6Syncmatica§r: {who} выложил §b{}§r, /lm shared {}", shared_title(s), n + 1),
+                        ));
+                    }
+                }
+                Event::Moved { id } => {
+                    let Some(s) = self.sync.get(id).cloned() else { continue };
+                    for p in self.placements.iter_mut().filter(|p| p.shared == Some(id)) {
+                        p.t = shared_transform(&s);
+                        p.dimension = Some(s.dimension.clone());
+                        p.relayout();
+                        self.save = true;
+                    }
+                }
+                Event::Removed { id } => {
+                    for p in self.placements.iter_mut().filter(|p| p.shared == Some(id)) {
+                        p.shared = None;
+                        out.push(t(
+                            ru,
+                            &format!("§6Syncmatica§r: {} was removed from the server; your copy stays", p.file),
+                            &format!("§6Syncmatica§r: {} убрали с сервера; у вас она остаётся", p.file),
+                        ));
+                    }
+                }
+                Event::Message(text) => out.push(format!("§6Syncmatica§r: {text}")),
+                Event::Failed { id } => {
+                    if self.wanted == Some(id) {
+                        self.wanted = None;
+                        out.push(t(ru, "§cThe download failed", "§cНе удалось скачать схему"));
+                    }
+                }
+                Event::Downloaded { id, bytes } => {
+                    if self.wanted != Some(id) {
+                        continue;
+                    }
+                    self.wanted = None;
+                    let Some(s) = self.sync.get(id).cloned() else { continue };
+                    let path = dir.join(format!("{}.litematic", shared_file(&s)));
+                    if let Some(parent) = path.parent() {
+                        let _ = std::fs::create_dir_all(parent);
+                    }
+                    if let Err(e) = std::fs::write(&path, &bytes) {
+                        out.push(format!("§c{}: {e}", path.display()));
+                    }
+                    match self.place_shared(&s, &bytes, ru) {
+                        Ok(line) => out.push(line),
+                        Err(e) => out.push(format!("§c{e}")),
+                    }
+                }
+            }
+        }
+        out
     }
 }
 
@@ -708,7 +915,8 @@ pub fn plan(want: &State, pos: [i32; 3], yaw: f32, solid: &dyn Fn([i32; 3]) -> b
     }
 }
 
-/// Keeps the placements of a world: one line each, `file|x|y|z|rotation|mirror`.
+/// Keeps the placements of a world: one line each,
+/// `file|x|y|z|rotation|mirror[|dimension]`.
 pub fn save_text(m: &Mod) -> String {
     m.placements
         .iter()
@@ -719,7 +927,11 @@ pub fn save_text(m: &Mod) -> String {
                 Mirror::LeftRight => "z",
                 Mirror::FrontBack => "x",
             };
-            format!("{}|{}|{}|{}|{}|{}", p.file, o[0], o[1], o[2], p.t.rotation, mirror)
+            let line = format!("{}|{}|{}|{}|{}|{}", p.file, o[0], o[1], o[2], p.t.rotation, mirror);
+            match &p.dimension {
+                Some(d) => format!("{line}|{d}"),
+                None => line,
+            }
         })
         .collect::<Vec<_>>()
         .join("\n")
@@ -729,7 +941,7 @@ pub fn load_text(text: &str, dir: &Path) -> Vec<Placement> {
     let mut out = Vec::new();
     for line in text.lines() {
         let f: Vec<&str> = line.split('|').collect();
-        if f.len() != 6 {
+        if f.len() != 6 && f.len() != 7 {
             continue;
         }
         let (Ok(x), Ok(y), Ok(z), Ok(rot)) = (f[1].parse(), f[2].parse(), f[3].parse(), f[4].parse::<u8>()) else {
@@ -742,7 +954,9 @@ pub fn load_text(text: &str, dir: &Path) -> Vec<Placement> {
         };
         let Ok(bytes) = std::fs::read(dir.join(format!("{}.litematic", f[0]))) else { continue };
         let Ok(s) = schematic::parse(&bytes) else { continue };
-        out.push(Placement::new(f[0].to_owned(), s, Transform { origin: [x, y, z], rotation: rot & 3, mirror }));
+        let mut p = Placement::new(f[0].to_owned(), s, Transform { origin: [x, y, z], rotation: rot & 3, mirror });
+        p.dimension = f.get(6).map(|d| (*d).to_owned());
+        out.push(p);
     }
     out
 }

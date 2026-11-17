@@ -20,6 +20,23 @@ fn litematica_tick(game: &mut crate::game::Game<'_>) {
             m.selected = m.placements.len().saturating_sub(1);
             m.world = world.clone();
             m.printer = false;
+            // Syncmatica starts again with the next server's handshake.
+            m.sync = lm::sync::Sync::default();
+            m.wanted = None;
+        });
+    }
+    // Syncmatica's requests (`/lm shared`).
+    for data in lm::with(|m| std::mem::take(&mut m.sync.out)) {
+        game.send(horizon_protocol::packets::play::Serverbound::CustomPayload(
+            horizon_protocol::packets::configuration::CustomPayload { channel: lm::sync::CHANNEL.into(), data },
+        ));
+    }
+    // Placements made in another dimension show only there.
+    if let Some(dim) = game.native_player().map(|p| p.dimension) {
+        lm::with(|m| {
+            for p in &mut m.placements {
+                p.shown = p.dimension.as_deref().is_none_or(|d| d == dim);
+            }
         });
     }
     if let Some(w) = world.as_ref() {

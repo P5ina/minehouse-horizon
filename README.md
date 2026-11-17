@@ -13,7 +13,9 @@ the MineHouse launcher and never compile anything.
 | Fast Trading | `mods/fasttrading` | nothing: client only (the trading window) |
 | Simple AutoClicker | `mods/autoclicker` | nothing: client only |
 | World Map | `mods/worldmap` | nothing: client only |
-| Litematica + Printer | `mods/litematica` | nothing: client only (Syncmatica not yet) |
+| Litematica + Printer | `mods/litematica` | nothing; Syncmatica's shared schematics when the server has it |
+| Minimap (official) | `mods/minimap` | nothing: client only; Horizon's own mod from horizon-rust/horizon-mods, MIT |
+| Zoom (official) | `mods/zoom` | nothing: client only; Horizon's own mod from horizon-rust/horizon-mods, MIT |
 | Controlling | `mods/controlling` | nothing: client only (Key Binds search) |
 | MineHouse | `mods/minehouse` | MineHouse's server mods: the anvil's real cost, the spawn zones' borders |
 

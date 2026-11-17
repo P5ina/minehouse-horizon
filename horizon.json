@@ -12,6 +12,8 @@
     "mods/controlling/mixins/controlling",
     "mods/autoclicker/mixins/autoclicker",
     "mods/worldmap/mixins/worldmap",
-    "mods/litematica/mixins/litematica"
+    "mods/litematica/mixins/litematica",
+    "mods/minimap/mixins/minimap",
+    "mods/zoom/mixins/zoom"
   ]
 }

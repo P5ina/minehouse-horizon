@@ -15,6 +15,12 @@ hotbar.
 - `/lm show`, `/lm hide`, `/lm info`, `/lm select <n>`, `/lm unload [all]`.
 
 Light blue boxes are missing blocks, red ones wrong blocks, orange ones the right block in the wrong state.
-Placements are kept per server and world. Syncmatica's shared placements are not supported yet.
+Placements are kept per server and world.
+
+**Syncmatica.** On a server with Syncmatica (0.3), the schematics players shared there are listed by
+`/lm shared`; `/lm shared <n>` downloads one into `schematics/syncmatica/` (checked against its hash) and places
+it where and how it stands on the server, in its own dimension. Moves on the server follow; a placement removed
+there stays here as your own. Sharing and moving shared placements from Horizon are not offered. The protocol
+is Syncmatica's (CC0), written anew here.
 
 License: MIT.

@@ -1,0 +1,11 @@
+[package]
+name = "horizon-mod-minimap"
+version = "2.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Horizon's official Minimap, a native mod: the terrain around you in a corner, in map colours."
+
+# The mod's logic and its tests: the same file the bundle adds to the game.
+[lib]
+path = "mixins/minimap/runtime.rs"
