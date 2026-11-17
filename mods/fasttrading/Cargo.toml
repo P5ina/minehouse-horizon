@@ -1,0 +1,10 @@
+[package]
+name = "horizon-mod-fasttrading"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Fast Trading for Horizon: repeat the selected villager trade until it runs out."
+
+[lib]
+path = "mixins/fasttrading/runtime.rs"

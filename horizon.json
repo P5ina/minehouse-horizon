@@ -7,6 +7,9 @@
     "mods/plasmovoice/mixins/plasmovoice",
     "mods/minehouse/mixins/minehouse",
     "mods/appleskin/mixins/appleskin",
-    "mods/chatheads/mixins/chatheads"
+    "mods/chatheads/mixins/chatheads",
+    "mods/fasttrading/mixins/fasttrading",
+    "mods/controlling/mixins/controlling",
+    "mods/autoclicker/mixins/autoclicker"
   ]
 }

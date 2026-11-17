@@ -10,6 +10,9 @@ the MineHouse launcher and never compile anything.
 | Plasmo Voice | `mods/plasmovoice` | the server's Plasmo Voice 2.1.x |
 | AppleSkin | `mods/appleskin` | the server's AppleSkin 3.0 (saturation, exhaustion) |
 | Chat Heads | `mods/chatheads` | nothing: client only |
+| Fast Trading | `mods/fasttrading` | nothing: client only (the trading window) |
+| Simple AutoClicker | `mods/autoclicker` | nothing: client only |
+| Controlling | `mods/controlling` | nothing: client only (Key Binds search) |
 | MineHouse | `mods/minehouse` | MineHouse's server mods: the anvil's real cost, the spawn zones' borders |
 
 - `horizon.json` pins the Horizon commit (and the Nightly whose files the build reuses) and horizon-mixins.
