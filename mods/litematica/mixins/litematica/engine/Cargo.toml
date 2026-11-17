@@ -1,0 +1,11 @@
+[package]
+name = "litematica-engine"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+description = "Litematica for Horizon: .litematic files, placements, their blocks and the printer's choices"
+publish = false
+
+# Only crates in Horizon's Cargo.lock, by version requirement.
+[dependencies]
+flate2 = "1.1"
