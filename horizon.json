@@ -11,6 +11,7 @@
     "mods/fasttrading/mixins/fasttrading",
     "mods/controlling/mixins/controlling",
     "mods/autoclicker/mixins/autoclicker",
-    "mods/worldmap/mixins/worldmap"
+    "mods/worldmap/mixins/worldmap",
+    "mods/litematica/mixins/litematica"
   ]
 }
