@@ -12,6 +12,7 @@ the MineHouse launcher and never compile anything.
 | Chat Heads | `mods/chatheads` | nothing: client only |
 | Fast Trading | `mods/fasttrading` | nothing: client only (the trading window) |
 | Simple AutoClicker | `mods/autoclicker` | nothing: client only |
+| World Map | `mods/worldmap` | nothing: client only |
 | Controlling | `mods/controlling` | nothing: client only (Key Binds search) |
 | MineHouse | `mods/minehouse` | MineHouse's server mods: the anvil's real cost, the spawn zones' borders |
 
