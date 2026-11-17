@@ -1,0 +1,11 @@
+[package]
+name = "horizon-mod-zoom"
+version = "2.0.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Horizon's official Zoom, a native mod: hold a key to zoom, the wheel changes it while held."
+
+# The mod's logic and its tests: the same file the bundle adds to the game.
+[lib]
+path = "mixins/zoom/runtime.rs"

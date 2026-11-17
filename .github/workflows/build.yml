@@ -39,6 +39,8 @@ jobs:
           cargo test --manifest-path mods/autoclicker/Cargo.toml
           cargo test --manifest-path mods/worldmap/Cargo.toml
           cargo test --manifest-path mods/litematica/mixins/litematica/engine/Cargo.toml
+          cargo test --manifest-path mods/minimap/Cargo.toml
+          cargo test --manifest-path mods/zoom/Cargo.toml
           cargo test --manifest-path mods/plasmovoice/mixins/plasmovoice/engine/Cargo.toml --release
 
   build:
