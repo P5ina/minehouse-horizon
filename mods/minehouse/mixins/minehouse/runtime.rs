@@ -6,7 +6,7 @@
 
 pub const ID: &str = "minehouse";
 pub const NAME: &str = "MineHouse";
-pub const VERSION: &str = "0.2.0";
+pub const VERSION: &str = "0.2.1";
 pub const DESCRIPTION: &str = "MineHouse's client features: the real anvil cost, the spawn zones' borders and the wardrobe (O).";
 
 /// `pro.minehouse.anvilclient.AnvilCostPayload`: varint container id, varint cost.
@@ -16,9 +16,13 @@ pub const ZONE_SHAPES: &str = "minehouse:zone_shapes";
 /// `pro.minehouse.menu.wardrobe.WardrobeNet`: one JSON string each way.
 pub const WARDROBE_STATE: &str = "minehouse-cosmetics:state";
 pub const WARDROBE_ACTION: &str = "minehouse-cosmetics:action";
+/// Tells the cosmetics mod this client doesn't draw the player's own hat and
+/// backpack on them, so it keeps sending them the vanilla way (helmet slot,
+/// passenger). Nothing comes on it.
+pub const WARDROBE_NO_SELF: &str = "minehouse-cosmetics:no_self";
 /// The channels the server mods look for: registering them is how they learn
 /// the client draws these itself (and that it has the wardrobe).
-pub const CHANNELS: [&str; 4] = [ANVIL_COST, ZONE_SHAPES, WARDROBE_STATE, WARDROBE_ACTION];
+pub const CHANNELS: [&str; 5] = [ANVIL_COST, ZONE_SHAPES, WARDROBE_STATE, WARDROBE_ACTION, WARDROBE_NO_SELF];
 /// Fabric only sends a play channel to a client that registered it.
 pub const REGISTER: &str = "minecraft:register";
 
@@ -867,7 +871,7 @@ mod tests {
     fn register_body() {
         assert_eq!(
             encode_register(&CHANNELS),
-            b"minehouse:anvil_cost\0minehouse:zone_shapes\0minehouse-cosmetics:state\0minehouse-cosmetics:action".to_vec()
+            b"minehouse:anvil_cost\0minehouse:zone_shapes\0minehouse-cosmetics:state\0minehouse-cosmetics:action\0minehouse-cosmetics:no_self".to_vec()
         );
     }
     fn wardrobe() -> Wardrobe {

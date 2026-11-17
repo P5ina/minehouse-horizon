@@ -10,7 +10,8 @@ A native [Horizon](https://github.com/horizon-rust/horizon) mod: the parts of th
 
 - **Wardrobe (O):** the shop of hats and backpacks (`minehouse-cosmetics:state` / `:action`): slot tabs,
   tiles with the server pack's models, wear / take off / buy, the 16 dyes, the balance and "Пополнить".
-  The Fabric screen's 3D look at yourself and drawing your own cosmetics on you are not ported.
+  The Fabric screen's 3D look at yourself is not ported. Your own hat and backpack come from the server the
+  vanilla way (helmet slot, passenger): `minehouse-cosmetics:no_self` asks for that (Cosmetics 0.6.1+).
 
 The channels are registered (`minecraft:register`) once the server has the player, which is how the
 server mods learn the client has them (and stop the action-bar cost and the particles).
