@@ -10,6 +10,7 @@
     "mods/chatheads/mixins/chatheads",
     "mods/fasttrading/mixins/fasttrading",
     "mods/controlling/mixins/controlling",
-    "mods/autoclicker/mixins/autoclicker"
+    "mods/autoclicker/mixins/autoclicker",
+    "mods/worldmap/mixins/worldmap"
   ]
 }

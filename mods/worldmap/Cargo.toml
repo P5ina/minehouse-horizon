@@ -1,0 +1,10 @@
+[package]
+name = "horizon-mod-worldmap"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "World Map for Horizon: a full-screen map of everything explored, saved per server and dimension."
+
+[lib]
+path = "mixins/worldmap/runtime.rs"
