@@ -1,21 +1,24 @@
 // MineHouse for Horizon: the client half of MineHouse's server features, ported
 // from the Fabric mod minehouse-client (minehouse-landing, `menu-mod/`): the
-// anvil's real cost and the spawn zones' borders.
+// anvil's real cost, the spawn zones' borders and the wardrobe.
 // This file is both the mod's Cargo library (its tests) and the module the
 // bundle adds to the game.
 
 pub const ID: &str = "minehouse";
 pub const NAME: &str = "MineHouse";
-pub const VERSION: &str = "0.1.0";
-pub const DESCRIPTION: &str = "MineHouse's client features: the real anvil cost and the spawn zones' borders.";
+pub const VERSION: &str = "0.2.0";
+pub const DESCRIPTION: &str = "MineHouse's client features: the real anvil cost, the spawn zones' borders and the wardrobe (O).";
 
 /// `pro.minehouse.anvilclient.AnvilCostPayload`: varint container id, varint cost.
 pub const ANVIL_COST: &str = "minehouse:anvil_cost";
 /// `pro.minehouse.zonesclient.ZoneShapesPayload`.
 pub const ZONE_SHAPES: &str = "minehouse:zone_shapes";
+/// `pro.minehouse.menu.wardrobe.WardrobeNet`: one JSON string each way.
+pub const WARDROBE_STATE: &str = "minehouse-cosmetics:state";
+pub const WARDROBE_ACTION: &str = "minehouse-cosmetics:action";
 /// The channels the server mods look for: registering them is how they learn
-/// the client draws these itself.
-pub const CHANNELS: [&str; 2] = [ANVIL_COST, ZONE_SHAPES];
+/// the client draws these itself (and that it has the wardrobe).
+pub const CHANNELS: [&str; 4] = [ANVIL_COST, ZONE_SHAPES, WARDROBE_STATE, WARDROBE_ACTION];
 /// Fabric only sends a play channel to a client that registered it.
 pub const REGISTER: &str = "minecraft:register";
 
@@ -281,6 +284,446 @@ pub fn wall_boxes(from: [f64; 3], to: [f64; 3], height: f64) -> Vec<([f64; 3], [
         .collect()
 }
 
+// --- The wardrobe (`pro.minehouse.menu.wardrobe`) ---------------------------------
+
+/// The key that opens it, as `Wardrobe.java` binds it (O).
+pub const KEY_WARDROBE: &str = "wardrobe";
+pub const DEFAULT_WARDROBE: &str = "key.keyboard.o";
+
+/// One thing in the shop. `color`: what the player dyed it (or the default),
+/// None when it can't be dyed.
+#[derive(Clone, Debug, PartialEq, Eq, serde::Deserialize)]
+pub struct Item {
+    pub id: String,
+    pub slot: String,
+    pub name: String,
+    pub price: i32,
+    pub owned: bool,
+    #[serde(default)]
+    pub color: Option<i32>,
+    #[serde(default, rename = "defaultColor")]
+    pub default_color: Option<i32>,
+}
+
+impl Item {
+    pub fn dyeable(&self) -> bool {
+        self.color.is_some()
+    }
+    /// The item model the server's resource pack gives it.
+    pub fn model(&self) -> String {
+        format!("minehouse-cosmetics:{}", self.id)
+    }
+}
+
+/// `WardrobeNet.State`, and whether the server asks to open the screen.
+#[derive(Clone, Debug, Default, PartialEq, Eq, serde::Deserialize)]
+pub struct Wardrobe {
+    pub coins: i32,
+    #[serde(default)]
+    pub store: String,
+    pub items: Vec<Item>,
+    #[serde(default)]
+    pub worn: std::collections::BTreeMap<String, String>,
+    #[serde(default)]
+    pub open: bool,
+}
+
+impl Wardrobe {
+    pub fn item(&self, id: &str) -> Option<&Item> {
+        self.items.iter().find(|i| i.id == id)
+    }
+    pub fn is_worn(&self, item: &Item) -> bool {
+        self.worn.get(&item.slot).is_some_and(|id| *id == item.id)
+    }
+}
+
+/// `minehouse-cosmetics:state`: `writeUtf` of the JSON.
+pub fn decode_wardrobe(data: &[u8]) -> Option<Wardrobe> {
+    let json = Reader(data).utf(1 << 20)?;
+    serde_json::from_str(&json).ok()
+}
+
+/// What the client asks the server for (`minehouse-cosmetics:action`).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Action {
+    Open,
+    Wear(String),
+    Remove(String),
+    Buy(String),
+    Dye(String, i32),
+}
+
+impl Action {
+    pub fn json(&self) -> String {
+        use serde_json::json;
+        match self {
+            Action::Open => json!({ "action": "open" }),
+            Action::Wear(id) => json!({ "action": "wear", "id": id }),
+            Action::Remove(slot) => json!({ "action": "remove", "slot": slot }),
+            Action::Buy(id) => json!({ "action": "buy", "id": id }),
+            Action::Dye(id, color) => json!({ "action": "dye", "id": id, "color": color }),
+        }
+        .to_string()
+    }
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        write_utf(&mut out, &self.json());
+        out
+    }
+}
+
+/// The tabs: title and server slot; one without a slot is "coming later".
+pub const SLOTS: [(&str, Option<&str>); 3] = [("Голова", Some("hat")), ("Спина", Some("backpack")), ("Плащ", None)];
+
+/// `DyeColor.getTextureDiffuseColor`, in `DyeColor` order.
+pub const DYES: [i32; 16] = [
+    0xF9FFFE, 0xF9801D, 0xC74EBD, 0x3AB3DA, 0xFED83D, 0x80C71F, 0xF38BAA, 0x474F52, 0x9D9D97, 0x169C9C, 0x8932B8,
+    0x3C44AA, 0x835432, 0x5E7C16, 0xB02E26, 0x1D1D21,
+];
+pub const DYE_NAMES: [&str; 16] = [
+    "Белый",
+    "Оранжевый",
+    "Сиреневый",
+    "Голубой",
+    "Жёлтый",
+    "Лаймовый",
+    "Розовый",
+    "Серый",
+    "Светло-серый",
+    "Бирюзовый",
+    "Фиолетовый",
+    "Синий",
+    "Коричневый",
+    "Зелёный",
+    "Красный",
+    "Чёрный",
+];
+/// The default colour first, then the 16 dyes.
+pub const SWATCHES: usize = DYES.len() + 1;
+
+pub fn swatch_color(item: &Item, i: usize) -> i32 {
+    if i == 0 { item.default_color.unwrap_or(0xFFFFFF) } else { DYES[i - 1] }
+}
+
+pub fn swatch_name(i: usize) -> &'static str {
+    if i == 0 { "Как было" } else { DYE_NAMES[i - 1] }
+}
+
+// The site's palette (zinc, dark), as `WardrobeScreen` has it.
+pub const CARD: u32 = 0xDB09_090B;
+pub const BORDER: u32 = 0xFF27_272A;
+pub const MUTED_BG: u32 = 0xFF18_181B;
+pub const HOVER_BG: u32 = 0xFF27_272A;
+pub const FG: u32 = 0xFAFAFA;
+pub const MUTED: u32 = 0xA1A1AA;
+pub const FAINT: u32 = 0x71717A;
+pub const DISABLED: u32 = 0x52525B;
+pub const PRIMARY: u32 = 0xFFFA_FAFA;
+pub const PRIMARY_HOVER: u32 = 0xFFE4_E4E7;
+pub const ON_PRIMARY: u32 = 0x18181B;
+pub const ACCENT: u32 = 0xA78BFA;
+pub const GREEN: u32 = 0x4ADE80;
+pub const RED: u32 = 0xF87171;
+
+pub const PAD: f32 = 8.0;
+pub const LEFT_W: f32 = 144.0;
+pub const RIGHT_W: f32 = 134.0;
+pub const PANEL_GAP: f32 = 6.0;
+pub const PANEL_H: f32 = 210.0;
+pub const TILE_W: f32 = 40.0;
+pub const TILE_H: f32 = 46.0;
+pub const GAP: f32 = 4.0;
+pub const COLS: usize = 3;
+pub const TABS_H: f32 = 18.0;
+pub const SWATCH: f32 = 12.0;
+pub const SWATCH_GAP: f32 = 4.0;
+pub const SWATCH_COLS: usize = 7;
+pub const BUTTON_H: f32 = 18.0;
+
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Rect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+impl Rect {
+    pub fn over(&self, p: [f32; 2]) -> bool {
+        p[0] >= self.x && p[0] < self.x + self.w && p[1] >= self.y && p[1] < self.y + self.h
+    }
+    pub fn grow(&self, by: f32) -> Rect {
+        Rect { x: self.x - by, y: self.y - by, w: self.w + by * 2.0, h: self.h + by * 2.0 }
+    }
+}
+
+/// Where the two cards and their parts are, for a screen `size` GUI pixels.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct Layout {
+    pub left: Rect,
+    pub right: Rect,
+    pub tabs: [Rect; 3],
+    /// The tile grid's visible area.
+    pub grid: Rect,
+}
+
+pub fn layout(size: [f32; 2]) -> Layout {
+    let h = PANEL_H.min(size[1] - 16.0).max(120.0);
+    let x = ((size[0] - LEFT_W - PANEL_GAP - RIGHT_W) / 2.0).floor();
+    let y = ((size[1] - h) / 2.0).floor();
+    let left = Rect { x, y, w: LEFT_W, h };
+    let right = Rect { x: x + LEFT_W + PANEL_GAP, y, w: RIGHT_W, h };
+    let tab_w = (LEFT_W - PAD * 2.0) / 3.0;
+    let tabs = [0.0, 1.0, 2.0].map(|i| Rect { x: x + PAD + tab_w * i, y: y + PAD, w: tab_w, h: TABS_H });
+    let gy = y + PAD + TABS_H + 6.0;
+    let grid = Rect { x: x + PAD, y: gy, w: LEFT_W - PAD * 2.0, h: y + h - PAD - 12.0 - gy };
+    Layout { left, right, tabs, grid }
+}
+
+/// Rows of tiles that fit in the grid.
+pub fn rows_shown(lay: &Layout) -> usize {
+    (((lay.grid.h + GAP) / (TILE_H + GAP)).floor() as usize).max(1)
+}
+
+/// Tile `i` of the shown items, `scroll` rows down; None when it is out of view.
+pub fn tile(lay: &Layout, i: usize, scroll: usize) -> Option<Rect> {
+    let row = (i / COLS).checked_sub(scroll)?;
+    if row >= rows_shown(lay) {
+        return None;
+    }
+    let col = (i % COLS) as f32;
+    Some(Rect {
+        x: lay.grid.x + col * (TILE_W + GAP),
+        y: lay.grid.y + row as f32 * (TILE_H + GAP),
+        w: TILE_W,
+        h: TILE_H,
+    })
+}
+
+pub fn max_scroll(lay: &Layout, shown: usize) -> usize {
+    shown.div_ceil(COLS).saturating_sub(rows_shown(lay))
+}
+
+/// Where the right card's parts are this frame (its height depends on the
+/// selected item's name and whether it can be dyed): the screen draws it and
+/// clicks read it.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct RightLayout {
+    pub swatch_y: Option<f32>,
+    pub buttons_y: f32,
+}
+
+impl RightLayout {
+    pub fn swatch(&self, lay: &Layout, i: usize) -> Option<Rect> {
+        let y = self.swatch_y?;
+        Some(Rect {
+            x: lay.right.x + PAD + (i % SWATCH_COLS) as f32 * (SWATCH + SWATCH_GAP),
+            y: y + (i / SWATCH_COLS) as f32 * (SWATCH + SWATCH_GAP),
+            w: SWATCH,
+            h: SWATCH,
+        })
+    }
+    pub fn action(&self, lay: &Layout) -> Rect {
+        let w = ((RIGHT_W - PAD * 2.0 - 6.0) / 2.0).floor();
+        Rect { x: lay.right.x + PAD, y: self.buttons_y, w, h: BUTTON_H }
+    }
+    pub fn take_off(&self, lay: &Layout) -> Rect {
+        let w = ((RIGHT_W - PAD * 2.0 - 6.0) / 2.0).floor();
+        Rect { x: lay.right.x + RIGHT_W - PAD - w, y: self.buttons_y, w, h: BUTTON_H }
+    }
+    /// The balance line under the buttons; "Пополнить" sits at its right end.
+    pub fn balance_y(&self) -> f32 {
+        self.buttons_y + 29.0
+    }
+    pub fn top_up(&self, lay: &Layout, text_w: f32) -> Rect {
+        let y = self.balance_y();
+        Rect { x: lay.right.x + RIGHT_W - PAD - text_w - 2.0, y: y - 2.0, w: text_w + 4.0, h: 14.0 }
+    }
+}
+
+pub const SWATCH_ROWS: usize = SWATCHES.div_ceil(SWATCH_COLS);
+
+/// The right card's layout with the selected item's name in `name_lines` lines.
+pub fn right_layout(lay: &Layout, item: Option<&Item>, name_lines: usize) -> RightLayout {
+    let mut y = lay.right.y + PAD + 16.0;
+    let mut swatch_y = None;
+    match item {
+        None => y += 40.0,
+        Some(item) => {
+            y += name_lines as f32 * 11.0 + 4.0;
+            if item.dyeable() {
+                y += 12.0;
+                swatch_y = Some(y);
+                y += SWATCH_ROWS as f32 * (SWATCH + SWATCH_GAP);
+            }
+        }
+    }
+    RightLayout { swatch_y, buttons_y: y + 6.0 }
+}
+
+/// `text` broken into lines no wider than `max`, by words (a word wider than
+/// the line gets a line of its own).
+pub fn wrap(text: &str, max: f32, width: impl Fn(&str) -> f32) -> Vec<String> {
+    let mut lines = Vec::new();
+    let mut line = String::new();
+    for word in text.split_whitespace() {
+        let candidate = if line.is_empty() { word.to_string() } else { format!("{line} {word}") };
+        if !line.is_empty() && width(&candidate) > max {
+            lines.push(std::mem::replace(&mut line, word.to_string()));
+        } else {
+            line = candidate;
+        }
+    }
+    if !line.is_empty() {
+        lines.push(line);
+    }
+    lines
+}
+
+/// What the screen remembers between frames.
+#[derive(Clone, Debug, Default)]
+pub struct WardrobeUi {
+    pub slot: usize,
+    pub selected: Option<String>,
+    pub scroll: usize,
+    /// The colour clicked for an item the player doesn't own yet (shown on the swatches).
+    pub tint: std::collections::BTreeMap<String, i32>,
+    /// The tile clicked last and when, for a double click.
+    pub last_click: Option<(String, std::time::Instant)>,
+    /// The screen and the right card as the last frame drew them.
+    pub layout: Layout,
+    pub right: RightLayout,
+}
+
+pub const DOUBLE_CLICK: std::time::Duration = std::time::Duration::from_millis(400);
+
+/// What a click asks of the game.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Clicked {
+    Send(Action),
+    OpenStore(String),
+}
+
+impl WardrobeUi {
+    pub fn slot_id(&self) -> Option<&'static str> {
+        SLOTS[self.slot.min(SLOTS.len() - 1)].1
+    }
+    pub fn shown<'a>(&self, w: &'a Wardrobe) -> Vec<&'a Item> {
+        let Some(slot) = self.slot_id() else { return Vec::new() };
+        w.items.iter().filter(|i| i.slot == slot).collect()
+    }
+    pub fn selected_item<'a>(&self, w: &'a Wardrobe) -> Option<&'a Item> {
+        w.item(self.selected.as_deref()?)
+    }
+    /// The colour shown as chosen for `item`.
+    pub fn color_of(&self, item: &Item) -> i32 {
+        self.tint.get(&item.id).copied().or(item.color).or(item.default_color).unwrap_or(0xFFFFFF)
+    }
+    /// `selectSlot`: the tab, and what is worn there selected.
+    pub fn select_slot(&mut self, w: &Wardrobe, slot: usize) {
+        if self.slot != slot {
+            self.slot = slot;
+            self.scroll = 0;
+        }
+        let worn = SLOTS[slot].1.and_then(|s| w.worn.get(s)).and_then(|id| w.item(id));
+        if let Some(item) = worn {
+            self.selected = Some(item.id.clone());
+        } else if self.selected_item(w).is_some_and(|i| Some(i.slot.as_str()) != SLOTS[slot].1) {
+            self.selected = None;
+        }
+    }
+    pub fn action_label(w: &Wardrobe, item: Option<&Item>) -> String {
+        match item {
+            Some(item) if w.is_worn(item) => "Снять".into(),
+            Some(item) if !item.owned => format!("{} MX", item.price),
+            _ => "Надеть".into(),
+        }
+    }
+    pub fn action_enabled(&self, w: &Wardrobe) -> bool {
+        self.selected_item(w).is_some_and(|i| i.owned || w.coins >= i.price)
+    }
+    pub fn scroll_by(&mut self, w: &Wardrobe, lay: &Layout, rows: i32) {
+        let max = max_scroll(lay, self.shown(w).len());
+        self.scroll = (self.scroll as i64 + i64::from(rows)).clamp(0, max as i64) as usize;
+    }
+    /// A left click at `p`; `top_up_w` is the width of "Пополнить".
+    pub fn click(&mut self, w: &Wardrobe, lay: &Layout, p: [f32; 2], top_up_w: f32, now: std::time::Instant) -> Vec<Clicked> {
+        let mut out = Vec::new();
+        if lay.left.over(p) {
+            for (i, tab) in lay.tabs.iter().enumerate() {
+                if SLOTS[i].1.is_some() && tab.over(p) {
+                    self.select_slot(w, i);
+                    return out;
+                }
+            }
+            let shown = self.shown(w);
+            for (i, item) in shown.iter().enumerate() {
+                if !tile(lay, i, self.scroll).is_some_and(|t| t.over(p)) {
+                    continue;
+                }
+                let double = self
+                    .last_click
+                    .as_ref()
+                    .is_some_and(|(id, at)| *id == item.id && now.duration_since(*at) <= DOUBLE_CLICK);
+                if double && item.owned {
+                    out.push(Clicked::Send(if w.is_worn(item) {
+                        Action::Remove(item.slot.clone())
+                    } else {
+                        Action::Wear(item.id.clone())
+                    }));
+                    self.last_click = None;
+                } else {
+                    self.last_click = Some((item.id.clone(), now));
+                }
+                self.selected = Some(item.id.clone());
+                return out;
+            }
+            return out;
+        }
+        if !lay.right.over(p) {
+            return out;
+        }
+        let right = self.right;
+        let selected = self.selected_item(w);
+        if let Some(item) = selected.filter(|i| i.dyeable()) {
+            for i in 0..SWATCHES {
+                if right.swatch(lay, i).is_some_and(|s| s.over(p)) {
+                    let rgb = swatch_color(item, i);
+                    self.tint.insert(item.id.clone(), rgb);
+                    if item.owned {
+                        out.push(Clicked::Send(Action::Dye(item.id.clone(), rgb)));
+                    }
+                    return out;
+                }
+            }
+        }
+        if right.action(lay).over(p) && self.action_enabled(w) {
+            if let Some(item) = selected {
+                out.push(Clicked::Send(if w.is_worn(item) {
+                    Action::Remove(item.slot.clone())
+                } else if item.owned {
+                    Action::Wear(item.id.clone())
+                } else {
+                    Action::Buy(item.id.clone())
+                }));
+            }
+            return out;
+        }
+        if right.take_off(lay).over(p) && !w.worn.is_empty() {
+            out.extend(w.worn.keys().map(|s| Clicked::Send(Action::Remove(s.clone()))));
+            self.selected = None;
+            return out;
+        }
+        if right.top_up(lay, top_up_w).over(p) && w.store.starts_with("https://") {
+            out.push(Clicked::OpenStore(w.store.clone()));
+        }
+        out
+    }
+}
+
+/// Seconds to wait for the state after asking to open before saying the server has no wardrobe.
+pub const NO_WARDROBE_AFTER: std::time::Duration = std::time::Duration::from_millis(1500);
+
 // --- State ---------------------------------------------------------------------
 
 #[derive(Default)]
@@ -294,6 +737,13 @@ pub struct State {
     pub anvil: AnvilCost,
     pub drawing_real: bool,
     pub shapes: Vec<Shape>,
+    /// The last wardrobe state the server sent (None on a server without one).
+    pub wardrobe: Option<Wardrobe>,
+    pub ui: WardrobeUi,
+    /// Actions the screen's clicks queued, sent on the next tick.
+    pub out: Vec<Action>,
+    /// When the player pressed the wardrobe key and no state has come yet.
+    pub asked: Option<std::time::Instant>,
 }
 
 impl State {
@@ -303,6 +753,10 @@ impl State {
         self.anvil = AnvilCost::default();
         self.drawing_real = false;
         self.shapes.clear();
+        self.wardrobe = None;
+        self.ui = WardrobeUi::default();
+        self.out.clear();
+        self.asked = None;
     }
 }
 
@@ -411,6 +865,106 @@ mod tests {
 
     #[test]
     fn register_body() {
-        assert_eq!(encode_register(&CHANNELS), b"minehouse:anvil_cost\0minehouse:zone_shapes".to_vec());
+        assert_eq!(
+            encode_register(&CHANNELS),
+            b"minehouse:anvil_cost\0minehouse:zone_shapes\0minehouse-cosmetics:state\0minehouse-cosmetics:action".to_vec()
+        );
+    }
+    fn wardrobe() -> Wardrobe {
+        let json = r#"{"coins":120,"store":"https://minehouse.pro/store","open":true,
+            "items":[{"id":"cap","slot":"hat","name":"Кепка","price":50,"owned":true,"color":16711680,"defaultColor":255},
+                     {"id":"crown","slot":"hat","name":"Корона","price":500,"owned":false},
+                     {"id":"bag","slot":"backpack","name":"Рюкзак","price":80,"owned":false}],
+            "worn":{"hat":"cap"}}"#;
+        let mut data = Vec::new();
+        write_utf(&mut data, json);
+        decode_wardrobe(&data).unwrap()
+    }
+
+    #[test]
+    fn wardrobe_state_decodes() {
+        let w = wardrobe();
+        assert_eq!(w.coins, 120);
+        assert!(w.open);
+        assert_eq!(w.items.len(), 3);
+        assert_eq!(w.item("cap").unwrap().default_color, Some(255));
+        assert!(w.is_worn(w.item("cap").unwrap()));
+        assert!(!w.item("crown").unwrap().dyeable());
+        assert_eq!(w.item("bag").unwrap().model(), "minehouse-cosmetics:bag");
+        assert_eq!(decode_wardrobe(&[3, b'{', b'}', b'x']), None);
+    }
+
+    #[test]
+    fn wardrobe_actions() {
+        assert_eq!(Action::Open.json(), r#"{"action":"open"}"#);
+        let v: serde_json::Value = serde_json::from_str(&Action::Dye("cap".into(), 0x3C44AA).json()).unwrap();
+        assert_eq!(v["action"], "dye");
+        assert_eq!(v["id"], "cap");
+        assert_eq!(v["color"], 0x3C44AA);
+        let enc = Action::Remove("hat".into()).encode();
+        assert_eq!(Reader(&enc).utf(4096).unwrap(), r#"{"action":"remove","slot":"hat"}"#);
+    }
+
+    #[test]
+    fn wardrobe_clicks() {
+        let w = wardrobe();
+        let lay = layout([427.0, 240.0]);
+        let mut ui = WardrobeUi::default();
+        let now = std::time::Instant::now();
+        let centre = |r: Rect| [r.x + r.w / 2.0, r.y + r.h / 2.0];
+        // The second hat tile selects the crown; the buy button buys... not with 120 MX.
+        let t = tile(&lay, 1, 0).unwrap();
+        assert!(ui.click(&w, &lay, centre(t), 40.0, now).is_empty());
+        assert_eq!(ui.selected.as_deref(), Some("crown"));
+        ui.right = right_layout(&lay, ui.selected_item(&w), 1);
+        assert!(!ui.action_enabled(&w));
+        assert!(ui.click(&w, &lay, centre(ui.right.action(&lay)), 40.0, now).is_empty());
+        // A double click on the worn cap takes it off.
+        let t = tile(&lay, 0, 0).unwrap();
+        assert!(ui.click(&w, &lay, centre(t), 40.0, now).is_empty());
+        let out = ui.click(&w, &lay, centre(t), 40.0, now + std::time::Duration::from_millis(200));
+        assert_eq!(out, vec![Clicked::Send(Action::Remove("hat".into()))]);
+        // A swatch dyes it.
+        ui.right = right_layout(&lay, ui.selected_item(&w), 1);
+        let s = ui.right.swatch(&lay, 12).unwrap();
+        let out = ui.click(&w, &lay, centre(s), 40.0, now);
+        assert_eq!(out, vec![Clicked::Send(Action::Dye("cap".into(), DYES[11]))]);
+        assert_eq!(ui.color_of(w.item("cap").unwrap()), DYES[11]);
+        // The back tab: nothing worn there, the cap is no longer selected.
+        let out = ui.click(&w, &lay, centre(lay.tabs[1]), 40.0, now);
+        assert!(out.is_empty());
+        assert_eq!(ui.slot, 1);
+        assert_eq!(ui.selected, None);
+        assert_eq!(ui.shown(&w).len(), 1);
+        // The cape tab is not there yet.
+        ui.click(&w, &lay, centre(lay.tabs[2]), 40.0, now);
+        assert_eq!(ui.slot, 1);
+        // "Снять всё" and the store link.
+        let out = ui.click(&w, &lay, centre(ui.right.take_off(&lay)), 40.0, now);
+        assert_eq!(out, vec![Clicked::Send(Action::Remove("hat".into()))]);
+        let out = ui.click(&w, &lay, centre(ui.right.top_up(&lay, 40.0)), 40.0, now);
+        assert_eq!(out, vec![Clicked::OpenStore("https://minehouse.pro/store".into())]);
+    }
+
+    #[test]
+    fn wardrobe_grid_scrolls() {
+        let lay = layout([427.0, 240.0]);
+        let rows = rows_shown(&lay);
+        assert!(rows >= 2);
+        assert_eq!(max_scroll(&lay, COLS * rows), 0);
+        assert_eq!(max_scroll(&lay, COLS * rows + 1), 1);
+        assert!(tile(&lay, COLS * rows, 0).is_none());
+        assert_eq!(tile(&lay, COLS * rows, 1).unwrap().y, lay.grid.y + (rows - 1) as f32 * (TILE_H + GAP));
+        assert!(tile(&lay, 0, 1).is_none());
+        let last = tile(&lay, COLS * rows - 1, 0).unwrap();
+        assert!(last.y + last.h <= lay.grid.y + lay.grid.h);
+    }
+
+    #[test]
+    fn wrapping() {
+        let w = |s: &str| s.chars().count() as f32 * 6.0;
+        assert_eq!(wrap("Кепка с длинным козырьком", 60.0, w), vec!["Кепка с", "длинным", "козырьком"]);
+        assert_eq!(wrap("Кепка", 60.0, w), vec!["Кепка"]);
+        assert!(wrap("", 60.0, w).is_empty());
     }
 }

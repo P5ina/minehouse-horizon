@@ -1,6 +1,6 @@
 [package]
 name = "horizon-mod-minehouse"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 license = "MIT"
 publish = false
@@ -8,3 +8,8 @@ description = "MineHouse for Horizon: the client half of MineHouse's server feat
 
 [lib]
 path = "mixins/minehouse/runtime.rs"
+
+# In the game these come from horizon-client, which has them.
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"

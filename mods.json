@@ -1,7 +1,7 @@
 [
   {"id": "plasmovoice", "name": "Plasmo Voice", "description": "Голосовой чат сервера"},
   {"id": "pingwheel", "name": "Ping Wheel", "description": "Метки в мире для друзей (колёсико)"},
-  {"id": "minehouse", "name": "MineHouse", "description": "Настоящая цена наковальни и границы зон спавна"},
+  {"id": "minehouse", "name": "MineHouse", "description": "Гардероб (O), настоящая цена наковальни и границы зон спавна"},
   {"id": "minimap", "name": "Миникарта", "description": "Карта местности в углу экрана"},
   {"id": "worldmap", "name": "Карта мира", "description": "Большая карта всего изученного, клавиша M"},
   {"id": "zoom", "name": "Zoom", "description": "Приближение, клавиша Z"},
