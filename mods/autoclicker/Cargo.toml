@@ -1,0 +1,10 @@
+[package]
+name = "horizon-mod-autoclicker"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+description = "Autoclicker for Horizon: toggleable left and right autoclicking and holding."
+
+[lib]
+path = "mixins/autoclicker/runtime.rs"
