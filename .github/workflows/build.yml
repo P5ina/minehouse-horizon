@@ -116,7 +116,8 @@ jobs:
           mkdir -p dist
           cp "stage-target/release/horizon-client${{ matrix.exe }}" "dist/horizon-client${{ matrix.exe }}"
           jq -n --arg h "${{ steps.pins.outputs.horizon }}" --arg n "${{ steps.pins.outputs.nightly }}" --arg c "${{ github.sha }}" \
-            --arg p "${{ matrix.name }}" '{horizon_revision:$h, horizon_nightly:$n, minehouse_commit:$c, platform:$p}' > dist/minehouse-horizon.json
+            --arg p "${{ matrix.name }}" --slurpfile mods mods.json \
+            '{horizon_revision:$h, horizon_nightly:$n, minehouse_commit:$c, platform:$p, mods:$mods[0]}' > dist/minehouse-horizon.json
           cd dist && if [ "${{ runner.os }}" = Windows ]; then 7z a ../minehouse-horizon-${{ matrix.name }}.zip . ; else zip -r ../minehouse-horizon-${{ matrix.name }}.zip . ; fi
       - uses: actions/upload-artifact@v4
         with:
