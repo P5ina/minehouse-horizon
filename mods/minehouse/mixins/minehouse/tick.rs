@@ -6,6 +6,21 @@ fn minehouse_tick(game: &mut crate::game::Game<'_>) {
     use crate::game::minehouse as m;
     use horizon_client::mod_api::ServerboundPlayPacket as S;
     use horizon_protocol::packets::configuration::CustomPayload;
+    // MineHouse players get Horizon's Mouse Tweaks controls on: once, so a
+    // player who switches them off in Extras keeps them off.
+    if !m::with(|s| s.tweaks_checked) && game.native_on(m::ID) {
+        m::with(|s| s.tweaks_checked = true);
+        let dir = game.native_data_dir(m::ID);
+        let marker = dir.join(m::MOUSE_TWEAKS_MARKER);
+        if !marker.exists() {
+            if !game.settings.extras.mouse_tweaks {
+                game.settings.extras.mouse_tweaks = true;
+                game.settings.save(&crate::game::Game::options_path());
+            }
+            let _ = std::fs::create_dir_all(&dir);
+            let _ = std::fs::write(&marker, "");
+        }
+    }
     if game.remote.is_none() || game.native_player().is_none() {
         m::with(|s| s.left_server());
         return;
