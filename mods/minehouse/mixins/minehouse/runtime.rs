@@ -6,7 +6,7 @@
 
 pub const ID: &str = "minehouse";
 pub const NAME: &str = "MineHouse";
-pub const VERSION: &str = "0.2.1";
+pub const VERSION: &str = "0.2.2";
 pub const DESCRIPTION: &str = "MineHouse's client features: the real anvil cost, the spawn zones' borders and the wardrobe (O).";
 
 /// `pro.minehouse.anvilclient.AnvilCostPayload`: varint container id, varint cost.
@@ -730,6 +730,11 @@ pub const NO_WARDROBE_AFTER: std::time::Duration = std::time::Duration::from_mil
 
 // --- State ---------------------------------------------------------------------
 
+/// Marker file in the mod's data folder: Horizon's Mouse Tweaks extra was
+/// switched on for this player once. A player who turns it off afterwards
+/// keeps it off.
+pub const MOUSE_TWEAKS_MARKER: &str = "mouse-tweaks-on";
+
 #[derive(Default)]
 pub struct State {
     /// The connection we registered our channels on: reset when it goes, or
@@ -748,6 +753,8 @@ pub struct State {
     pub out: Vec<Action>,
     /// When the player pressed the wardrobe key and no state has come yet.
     pub asked: Option<std::time::Instant>,
+    /// Whether this run already checked that Mouse Tweaks was switched on once.
+    pub tweaks_checked: bool,
 }
 
 impl State {
