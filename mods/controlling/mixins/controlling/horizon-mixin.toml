@@ -1,6 +1,6 @@
 [mod]
 id = "controlling"
-version = "26.3.4"
+version = "26.3.5"
 priority = 100
 
 [compatibility]
@@ -37,4 +37,25 @@ target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
+]
+
+# The native mods' keys at the top of Key Binds' list: the list's first row
+# starts lower by their rows' height.
+[[injection]]
+id = "mod-keys"
+kind = "MODIFY_VARIABLE"
+target = "horizon_client_render::options_ui::OptionsUi::layout"
+variable = { name = "y", ordinal = 3, at = "STORE" }
+require = 3
+ordinal = 0
+helper = "mod_keys.rs"
+bindings = [
+  { name = "value", ty = "f32", value = "$value" },
+  { name = "out", ty = "&mut Vec<Widget>", value = "$local_mut:out:0" },
+  { name = "rows", ty = "&mut ListRows", value = "$local_mut:rows:0" },
+  { name = "ui", ty = "&OptionsUi", value = "&*self" },
+  { name = "s", ty = "&crate::settings::Settings", value = "s" },
+  { name = "query", ty = "&String", value = "$local_ref:query:0" },
+  { name = "w", ty = "f32", value = "w" },
+  { name = "cx", ty = "f32", value = "$local:cx:0" },
 ]
