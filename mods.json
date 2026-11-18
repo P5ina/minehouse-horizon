@@ -4,7 +4,7 @@
   {"id": "minehouse", "name": "MineHouse", "description": "Гардероб (O), настоящая цена наковальни и границы зон спавна"},
   {"id": "minimap", "name": "Миникарта", "description": "Карта местности в углу экрана"},
   {"id": "worldmap", "name": "Карта мира", "description": "Большая карта всего изученного, клавиша M"},
-  {"id": "zoom", "name": "Zoom", "description": "Приближение, клавиша Z"},
+  {"id": "zoom", "name": "Zoom", "description": "Приближение, клавиша C"},
   {"id": "appleskin", "name": "AppleSkin", "description": "Насыщение и сытость еды у шкалы голода"},
   {"id": "chatheads", "name": "Chat Heads", "description": "Головы игроков в чате"},
   {"id": "litematica", "name": "Litematica", "description": "Схемы .litematic в мире, принтер и Syncmatica"},

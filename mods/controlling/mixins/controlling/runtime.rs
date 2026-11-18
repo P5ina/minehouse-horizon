@@ -6,6 +6,6 @@
 
 pub const ID: &str = "controlling";
 pub const NAME: &str = "Controlling";
-pub const VERSION: &str = "26.3.4";
+pub const VERSION: &str = "26.3.5";
 pub const DESCRIPTION: &str =
     "Key Binds search also finds a binding by its key (\"G\", \"Left Button\") and by its category.";
