@@ -1,5 +1,5 @@
 // Horizon's official Zoom, formerly the WebAssembly mod and before that a
-// built-in extra: hold the key (Z by default) to zoom in, and turn the mouse
+// built-in extra: hold the key (C by default) to zoom in, and turn the mouse
 // wheel while holding it to zoom further in or out. Its settings are the
 // WebAssembly mod's files (`horizon-mods/.horizon-mod-data/zoom/level`,
 // `smooth`, `sensitivity`) and its key `key.zoom.zoom` in `horizon-mods.txt`,
@@ -9,12 +9,12 @@ use std::cell::RefCell;
 
 /// The mod's id: its settings folder and its key's line.
 pub const ID: &str = "zoom";
-pub const VERSION: &str = "2.0.0";
+pub const VERSION: &str = "2.0.1";
 pub const DESCRIPTION: &str =
     "Hold a key to zoom in; the mouse wheel changes the zoom while you hold it. Horizon's own.";
 /// The key's name, and its default.
 pub const KEY: &str = "zoom";
-pub const DEFAULT_KEY: &str = "key.keyboard.z";
+pub const DEFAULT_KEY: &str = "key.keyboard.c";
 /// The zooms the starting zoom cycles through, and the wheel's limits.
 pub const LEVELS: [u8; 6] = [2, 3, 4, 6, 8, 10];
 const MIN: f32 = 1.25;

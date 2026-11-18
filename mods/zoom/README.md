@@ -1,6 +1,6 @@
 # Zoom (Horizon native mod)
 
-Horizon's official Zoom: hold a key (Z by default) to zoom in, and turn the mouse wheel while you hold it to zoom
+Horizon's official Zoom: hold a key (C by default) to zoom in, and turn the mouse wheel while you hold it to zoom
 further in or out. Its settings page (Options > Mods > Zoom > Settings) has the key and three options: the
 starting zoom (2x to 10x), smooth zoom (eased like the spyglass) and slower turning while zoomed.
 

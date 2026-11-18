@@ -1,6 +1,6 @@
 [mod]
 id = "zoom"
-version = "2.0.0"
+version = "2.0.1"
 priority = 100
 
 # The commit it was tested on. It uses only the native hook points (hooks 1 in
