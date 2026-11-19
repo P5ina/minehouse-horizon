@@ -4,7 +4,7 @@
 // and write back changed settings.
 fn pingwheel_tick(game: &mut crate::game::Game<'_>) {
     use crate::game::pingwheel as m;
-    use horizon_client::mod_api::ServerboundPlayPacket as S;
+    use horizon_protocol::packets::play::Serverbound as S;
     use horizon_protocol::packets::configuration::CustomPayload;
     if !game.native_on(m::ID) {
         return;
@@ -88,7 +88,7 @@ fn pingwheel_tick(game: &mut crate::game::Game<'_>) {
     // crouching) and the entity (its box grown by a quarter block) along the view.
     fn pingwheel_ping(game: &mut crate::game::Game<'_>, tick: i64) {
         use crate::game::pingwheel as m;
-        use horizon_client::mod_api::ServerboundPlayPacket as S;
+        use horizon_protocol::packets::play::Serverbound as S;
         use horizon_protocol::packets::configuration::CustomPayload;
         let Some(cam) = game.native_camera() else { return };
         let (reach, crouching) = m::with(|s| {

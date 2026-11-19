@@ -20,9 +20,17 @@ the MineHouse launcher and never compile anything.
 | MineHouse | `mods/minehouse` | MineHouse's server mods: the wardrobe (O), the anvil's real cost, the spawn zones' borders |
 
 - `horizon.json` pins the Horizon commit (and the Nightly it came from) and horizon-mixins.
-- `patches/*.patch`: our fixes to Horizon itself (`git diff` against the pinned commit), applied
-  before the mods. `0001`: a sleeper keeps the position the server sends (`/lay` showed the world
-  from under it).
+- `patches/*.patch`: our changes to Horizon itself (`git diff` against the pinned commit), applied
+  before the mods. `0002-minehouse-compat`: the hook points and host calls our mods were written
+  against (Horizon 9f42064, before its native and wasm mod APIs merged), kept in one file
+  (`native_hooks/minehouse_compat.rs`) with a one-line call where each old point fired, so a newer
+  Horizon only moves this patch; it also adds `horizon-stage materialize` and qualifies a few
+  macros so horizon-mixins can read the functions our mods target.
+- `tools/stage.py` prepares Horizon as the launcher prepares horizon-mixins' input: the generated
+  module lists written out, `#[replaceable]` (a no-op in a build) taken off.
+- `tools/horizon-mixins-*.patch`: applied to the pinned horizon-mixins before CI builds it.
+  `narrow-reference-rule` is Horizon's own (`tools/mixins/` in Horizon); `parent-paths` lets a
+  `#[path]` climb with `..` inside the workspace, as Horizon's game modules do.
 - Horizon deletes a dated Nightly after a few days, so CI builds Horizon's other files for the
   pinned commit itself: `horizon-prepare` and the Java exporters (compiled against Minecraft
   downloaded from Mojang on the runner by `tools/fetch_minecraft.py`; only Horizon's classes leave

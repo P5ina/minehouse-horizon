@@ -13,7 +13,7 @@ fn minehouse_mouse(
     if button != 0 {
         return;
     }
-    let top_up_w = game.native_text_width("Пополнить");
+    let top_up_w = game.mh_text_width("Пополнить");
     let clicked = m::with(|s| {
         let Some(w) = s.wardrobe.clone() else { return Vec::new() };
         let lay = s.ui.layout;

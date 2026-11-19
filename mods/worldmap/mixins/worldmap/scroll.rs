@@ -1,7 +1,7 @@
 // The wheel zooms about the pointer.
 fn worldmap_scroll(
     game: &crate::game::Game<'_>,
-    screen: &horizon_client::mod_api::NativeScreenView<'_>,
+    screen: &crate::game::native_hooks::NativeScreenView<'_>,
     scroll: [f64; 2],
     canceled: &mut bool,
 ) {

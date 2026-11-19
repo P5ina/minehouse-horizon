@@ -11,8 +11,8 @@ fn worldmap_frame(game: &mut crate::game::Game<'_>) {
     let dir = match (on, world, player.as_ref()) {
         (true, Some(world), Some(p)) => {
             let world = match world {
-                crate::game::native_client_services::NativeWorldId::Singleplayer(s) => format!("local_{s}"),
-                crate::game::native_client_services::NativeWorldId::Server(s) => format!("server_{s}"),
+                crate::game::native_hooks::NativeWorldId::Singleplayer(s) => format!("local_{s}"),
+                crate::game::native_hooks::NativeWorldId::Server(s) => format!("server_{s}"),
             };
             let dim = p.dimension.trim_start_matches("minecraft:");
             Some(game.native_data_dir(m::ID).join(m::folder_name(&world)).join(m::folder_name(dim)))
@@ -44,6 +44,7 @@ fn worldmap_frame(game: &mut crate::game::Game<'_>) {
                     horizon_client::blocks::Fluid::None => 0,
                     horizon_client::blocks::Fluid::Water => 1,
                     horizon_client::blocks::Fluid::Lava => 2,
+                    _ => 0,
                 };
                 if facts.is_air(horizon_world::registry::BlockStateId(i as u32)) {
                     b |= m::AIR;

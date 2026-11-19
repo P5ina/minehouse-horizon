@@ -3,7 +3,7 @@
 // category, kept in the game's order: category, then name.
 fn controlling_search(
     value: usize,
-    mappings: &mut Vec<(&str, &str)>,
+    mappings: &mut Vec<(&'static str, &'static str)>,
     query: &String,
     s: &crate::settings::Settings,
 ) -> usize {

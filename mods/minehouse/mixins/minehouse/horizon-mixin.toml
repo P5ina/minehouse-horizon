@@ -4,7 +4,7 @@ version = "0.3.0"
 priority = 100
 
 [compatibility]
-horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
 
 [[module]]
 id = "runtime"
@@ -15,17 +15,17 @@ source = "runtime.rs"
 [[injection]]
 id = "packet"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_client_packet"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_client_play_packet"
 helper = "packet.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "packet", ty = "&horizon_client::mod_api::ClientboundPlayPacket", value = "packet" },
+  { name = "packet", ty = "&horizon_protocol::packets::play::Clientbound", value = "packet" },
 ]
 
 [[injection]]
 id = "tick"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_client_tick_post"
+target = "horizon_client::game::native_hooks::client_tick_post::Game<'_>::native_client_tick_post"
 helper = "tick.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -34,7 +34,7 @@ bindings = [
 [[injection]]
 id = "zones"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_world_primitives"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_world_primitives"
 helper = "zones.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
@@ -44,7 +44,7 @@ bindings = [
 [[injection]]
 id = "key"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_key"
 helper = "key.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -55,18 +55,18 @@ bindings = [
 [[injection]]
 id = "screen"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_render_post"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_render_post"
 helper = "screen.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
-  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *draw" },
   { name = "screen", ty = "&crate::game::native_hooks::NativeScreenView<'_>", value = "screen" },
 ]
 
 [[injection]]
 id = "mouse"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_button_pressed_pre"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_mouse_button_pressed_pre"
 helper = "mouse.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
@@ -78,7 +78,7 @@ bindings = [
 [[injection]]
 id = "scroll"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_scrolled_pre"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_mouse_scrolled_pre"
 helper = "scroll.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
@@ -89,7 +89,7 @@ bindings = [
 [[injection]]
 id = "list"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_mods"
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
@@ -100,7 +100,7 @@ bindings = [
 [[injection]]
 id = "anvil-cost"
 kind = "MODIFY_VARIABLE"
-target = "horizon_client::game::stations::Game<'_>::draw_station"
+target = "horizon_client::game::stations::draw::Game<'_>::draw_station"
 variable = { name = "cost", ordinal = 1, at = "STORE" }
 require = 1
 ordinal = 0
@@ -112,7 +112,7 @@ bindings = [{ name = "value", ty = "i32", value = "$value" }]
 [[injection]]
 id = "anvil-limit"
 kind = "MODIFY_VARIABLE"
-target = "horizon_client::game::stations::Game<'_>::draw_station"
+target = "horizon_client::game::stations::draw::Game<'_>::draw_station"
 variable = { name = "cost", ordinal = 1, at = "LOAD" }
 require = 3
 ordinal = 1
@@ -156,7 +156,7 @@ bindings = [
 [[injection]]
 id = "title-splash"
 kind = "HEAD"
-target = "horizon_client_lib::title::Title::poll_backup"
+target = "horizon_client_lib::title::missing_mods::Title::poll_backup"
 helper = "title_splash.rs"
 bindings = [
   { name = "title", ty = "&mut Title", value = "&mut *self" },
@@ -167,7 +167,7 @@ bindings = [
 id = "title-buttons"
 kind = "HEAD"
 cancellable = true
-target = "horizon_client_lib::title::Title::buttons"
+target = "horizon_client_lib::title::preset_buttons::Title::buttons"
 helper = "title_buttons.rs"
 bindings = [
   { name = "title", ty = "&Title", value = "self" },

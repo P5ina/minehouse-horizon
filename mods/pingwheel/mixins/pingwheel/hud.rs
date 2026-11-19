@@ -57,7 +57,7 @@ fn pingwheel_hud(
     };
     // `DrawContext.renderLabel`: a translucent box and the text, `y_offset` lines from the centre.
     let draw_label = |batch: &mut horizon_client::hud::HudBatch, text: &str, y_offset: f32, color: u32| {
-        let w = game.native_text_width(text);
+        let w = game.mh_text_width(text);
         let (x, y) = (-w * 0.5, -font_h * 0.5 + font_h * y_offset);
         game.native_fill(batch, [x - 2.0, y - 2.0, w + 3.0, font_h + 2.0], m::SHADOW_BLACK);
         game.native_text(batch, text, [x, y], color & 0xFF_FFFF, false);

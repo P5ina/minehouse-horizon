@@ -1,10 +1,10 @@
 // A packet from the server: Ping Wheel's pings (`PingManager.acceptPingPacket`).
 fn pingwheel_packet(
     game: &mut crate::game::Game<'_>,
-    packet: &horizon_client::mod_api::ClientboundPlayPacket,
+    packet: &horizon_protocol::packets::play::Clientbound,
 ) {
     use crate::game::pingwheel as m;
-    use horizon_client::mod_api::ClientboundPlayPacket as C;
+    use horizon_protocol::packets::play::Clientbound as C;
     if !game.native_on(m::ID) {
         return;
     }

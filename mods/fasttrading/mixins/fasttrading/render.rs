@@ -3,7 +3,7 @@
 fn fasttrading_render(
     game: &crate::game::Game<'_>,
     batch: &mut horizon_client::hud::HudBatch,
-    screen: &horizon_client::mod_api::NativeScreenView<'_>,
+    screen: &crate::game::native_hooks::NativeScreenView<'_>,
 ) {
     use crate::game::fasttrading as m;
     if screen.menu != Some(m::MERCHANT_MENU) || !game.native_on(m::ID) {

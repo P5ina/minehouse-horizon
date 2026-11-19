@@ -30,7 +30,7 @@ fn appleskin_hud(
             }
         }
         let always = horizon_client::item_sync::can_always_eat(stack, info.can_always_eat);
-        Some((m::Food { nutrition: nutrition as i32, saturation, rotten, regeneration }, game.can_eat(stack, always)))
+        Some((m::Food { nutrition: nutrition as i32, saturation, rotten, regeneration }, game.can_eat(Some(stack), always)))
     };
     let main = game.inventory.get(game.selected).cloned().flatten();
     let off = game.offhand.clone();

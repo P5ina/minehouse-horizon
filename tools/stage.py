@@ -23,6 +23,19 @@ def main():
     for path in list(a.source.rglob("*")):
         if path.is_symlink():
             path.unlink()
+    # horizon-mixins follows `mod` declarations, not the game's generated module lists: write
+    # them out first, as the launcher prepares its input (patch 0002 adds the command).
+    subprocess.run(["cargo", "run", "--quiet", "--release", "-p", "horizon-mod-api-gen", "--bin", "horizon-stage",
+                    "--", "materialize", str(a.source.resolve())], cwd=a.source, check=True)
+    # `#[replaceable]` does nothing in a build (docs: the stager rewrites the function only in
+    # its own copy), but horizon-mixins refuses a target with an attribute macro it can't expand.
+    for path in (a.source / "crates").rglob("*.rs"):
+        # Bytes, not text: Windows' default encoding can't read every source file.
+        data = path.read_bytes()
+        if b"replaceable]" in data:
+            lines = [l for l in data.splitlines(keepends=True)
+                     if l.strip() not in (b"#[horizon_mod_api_macros::replaceable]", b"#[replaceable]")]
+            path.write_bytes(b"".join(lines))
     (a.source / ".horizon-revision").write_text(cfg["horizon_revision"] + "\n")
     mods = a.out.parent / "mods-incoming"
     shutil.rmtree(mods, ignore_errors=True)

@@ -2,7 +2,7 @@
 // player, and move the flash (`HUDOverlayHandler.onClientTick`).
 fn appleskin_tick(game: &mut crate::game::Game<'_>) {
     use crate::game::appleskin as m;
-    use horizon_client::mod_api::ServerboundPlayPacket as S;
+    use horizon_protocol::packets::play::Serverbound as S;
     use horizon_protocol::packets::configuration::CustomPayload;
     if game.remote.is_none() || game.native_player().is_none() {
         m::with(|s| s.left_server());

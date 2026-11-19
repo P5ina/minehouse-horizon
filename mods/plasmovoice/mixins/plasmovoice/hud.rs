@@ -15,7 +15,7 @@ fn voicechat_hud(
     let (w, h) = (batch.width, batch.height);
     let sprite = |game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::HudBatch, icon: &str, dst: [f32; 4]| {
         if let Some(src) = vc::icons::cell(icon) {
-            game.native_sprite(batch, "horizon/modimage", src, dst);
+            game.mh_sprite(batch, "horizon/modimage", src, dst);
         }
     };
     // The voice distance (`DistanceVisualizeRenderer`): a ring on the
@@ -80,7 +80,7 @@ fn voicechat_hud(
     };
     if game.native_corner_shown(corner) {
         for (name, icon) in vc::overlay() {
-            let tw = game.native_text_width(&name);
+            let tw = game.mh_text_width(&name);
             let (x, y) = corners.place(corner, tw + 16.0, 12.0);
             game.native_fill(batch, [x, y, tw + 16.0, 12.0], 0x4000_0000);
             sprite(game, batch, icon, [x + 1.0, y + 1.0, 10.0, 10.0]);
@@ -89,7 +89,7 @@ fn voicechat_hud(
     }
     // A connection problem, as Plasmo tells it in chat, stays visible here.
     for line in vc::hud(&game.native_mod_key(vc::ID, vc::KEY_PTT, vc::DEFAULT_PTT)).into_iter().filter(|l| l.rgb == 0xFF5555) {
-        let tw = game.native_text_width(&line.text) + 4.0;
+        let tw = game.mh_text_width(&line.text) + 4.0;
         let (x, y) = corners.place(Corner::TopLeft, tw, 12.0);
         game.native_fill(batch, [x, y, tw, 12.0], 0x9000_0000);
         game.native_text(batch, &line.text, [x + 2.0, y + 2.0], line.rgb, true);

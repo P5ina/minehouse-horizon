@@ -1,7 +1,7 @@
 // The wardrobe key (O) while playing: ask the server to open it.
 fn minehouse_key(game: &mut crate::game::Game<'_>, key: &str, pressed: bool) {
     use crate::game::minehouse as m;
-    use horizon_client::mod_api::ServerboundPlayPacket as S;
+    use horizon_protocol::packets::play::Serverbound as S;
     use horizon_protocol::packets::configuration::CustomPayload;
     if !pressed || !game.native_on(m::ID) || !game.native_playing() {
         return;
