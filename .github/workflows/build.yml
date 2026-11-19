@@ -154,7 +154,7 @@ jobs:
           stamp="${{ steps.pins.outputs.mixins }}-${{ hashFiles('tools/horizon-mixins-*.patch') }}"
           if [ "$(cat mixins-bin/stamp 2>/dev/null)" != "$stamp" ]; then
             rm -rf mixins-src mixins-bin
-            git clone -q https://github.com/horizon-rust/horizon-mixins mixins-src
+            git -c core.autocrlf=false clone -q https://github.com/horizon-rust/horizon-mixins mixins-src
             git -C mixins-src checkout -q ${{ steps.pins.outputs.mixins }}
             for patch in tools/horizon-mixins-*.patch; do git -C mixins-src apply "$PWD/$patch"; done
             cargo install --locked --path mixins-src/crates/horizon-mixins-cli --root mixins-bin
