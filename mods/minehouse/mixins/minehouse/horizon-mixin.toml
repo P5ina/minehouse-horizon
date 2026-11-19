@@ -1,6 +1,6 @@
 [mod]
 id = "minehouse"
-version = "0.2.2"
+version = "0.3.0"
 priority = 100
 
 [compatibility]
@@ -128,4 +128,49 @@ helper = "anvil_take.rs"
 bindings = [
   { name = "value", ty = "bool", value = "$value" },
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
+]
+
+# The end of Chapter 1 on the title (`minehouse:chapter_end`): the state lives
+# next to the title, which is in the client library, not the game crate...
+[[module]]
+id = "chapter"
+file = "crates/horizon-client/src/title.rs"
+name = "minehouse_chapter"
+visibility = "pub"
+source = "chapter.rs"
+
+# ...the screen goes black and the dot takes the logo's place...
+[[injection]]
+id = "title-logo"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_lib::title::draw_logo"
+helper = "title_logo.rs"
+bindings = [
+  { name = "atlas", ty = "&HudAtlas", value = "atlas" },
+  { name = "batch", ty = "&mut HudBatch", value = "&mut *batch" },
+  { name = "w", ty = "f32", value = "w" },
+]
+
+# ...with no splash (the title's frame-by-frame poll)...
+[[injection]]
+id = "title-splash"
+kind = "HEAD"
+target = "horizon_client_lib::title::Title::poll_backup"
+helper = "title_splash.rs"
+bindings = [
+  { name = "title", ty = "&mut Title", value = "&mut *self" },
+]
+
+# ...and no Realms.
+[[injection]]
+id = "title-buttons"
+kind = "HEAD"
+cancellable = true
+target = "horizon_client_lib::title::Title::buttons"
+helper = "title_buttons.rs"
+bindings = [
+  { name = "title", ty = "&Title", value = "self" },
+  { name = "w", ty = "f32", value = "w" },
+  { name = "h", ty = "f32", value = "h" },
 ]

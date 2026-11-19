@@ -13,10 +13,16 @@ A native [Horizon](https://github.com/horizon-rust/horizon) mod: the parts of th
   The Fabric screen's 3D look at yourself is not ported. Your own hat and backpack come from the server the
   vanilla way (helmet slot, passenger): `minehouse-cosmetics:no_self` asks for that (Cosmetics 0.6.1+).
 
+- **End of Chapter 1:** when the server sends `minehouse:chapter_end` (Events' `swallow`, right before it
+  kicks everyone and stops), the title turns black with the dot in place of the logo, no splash and no
+  Realms; Singleplayer and Multiplayer stay. The mark is `horizon-mods/.horizon-mod-data/minehouse/chapter-end.txt`
+  and goes once MineHouse lets the player in again, at least 5 minutes after the end (as the Fabric mod's
+  `ChapterEnd`). The pull into the hole itself is the server's vanilla post effects, which Horizon applies.
+
 The channels are registered (`minecraft:register`) once the server has the player, which is how the
 server mods learn the client has them (and stop the action-bar cost and the particles).
 
-Not ported (yet): the main menu and pack updater (the launcher does that), the Rift mode's client and the
+Not ported (yet): the rest of the main menu and the pack updater (the launcher does that), the Rift mode's client and the
 show editor.
 
 License: MIT.

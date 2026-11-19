@@ -1,6 +1,6 @@
 // A packet from the server: the anvil's real cost, the zones to draw, the
-// wardrobe, and which window is open; a new `Login` (a proxy moving us on)
-// starts clean.
+// wardrobe, which window is open and the end of Chapter 1; a new `Login` (a
+// proxy moving us on) starts clean.
 fn minehouse_packet(
     game: &mut crate::game::Game<'_>,
     packet: &horizon_client::mod_api::ClientboundPlayPacket,
@@ -8,7 +8,12 @@ fn minehouse_packet(
     use crate::game::minehouse as m;
     use horizon_client::mod_api::ClientboundPlayPacket as C;
     match packet {
-        C::Login(_) => m::with(|s| s.left_server()),
+        C::Login(_) => {
+            m::with(|s| s.left_server());
+            // Back on MineHouse after the end of Chapter 1: the title is itself again.
+            horizon_client::title::minehouse_chapter::joined(game.server_address());
+        }
+        C::CustomPayload(p) if p.channel == m::CHAPTER_END => horizon_client::title::minehouse_chapter::mark(),
         C::OpenScreen(p) => m::with(|s| s.open_container = Some(p.container)),
         C::ContainerClose(p) => m::with(|s| {
             if s.open_container == Some(p.container) {
