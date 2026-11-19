@@ -30,11 +30,12 @@ def main():
     # `#[replaceable]` does nothing in a build (docs: the stager rewrites the function only in
     # its own copy), but horizon-mixins refuses a target with an attribute macro it can't expand.
     for path in (a.source / "crates").rglob("*.rs"):
-        text = path.read_text()
-        if "replaceable]" in text:
-            lines = [l for l in text.splitlines(keepends=True)
-                     if l.strip() not in ("#[horizon_mod_api_macros::replaceable]", "#[replaceable]")]
-            path.write_text("".join(lines))
+        # Bytes, not text: Windows' default encoding can't read every source file.
+        data = path.read_bytes()
+        if b"replaceable]" in data:
+            lines = [l for l in data.splitlines(keepends=True)
+                     if l.strip() not in (b"#[horizon_mod_api_macros::replaceable]", b"#[replaceable]")]
+            path.write_bytes(b"".join(lines))
     (a.source / ".horizon-revision").write_text(cfg["horizon_revision"] + "\n")
     mods = a.out.parent / "mods-incoming"
     shutil.rmtree(mods, ignore_errors=True)
