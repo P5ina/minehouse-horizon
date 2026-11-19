@@ -43,8 +43,62 @@ jobs:
           cargo test --manifest-path mods/zoom/Cargo.toml
           cargo test --manifest-path mods/plasmovoice/mixins/plasmovoice/engine/Cargo.toml --release
 
+  exporters:
+    # Horizon's Java exporters for the pinned commit, compiled against Minecraft downloaded from
+    # Mojang here: Horizon deletes a dated Nightly after a few days, so our release carries the
+    # Horizon files the launcher needs (horizon-prepare and these classes) itself. Only Horizon's
+    # own compiled classes leave the runner; the game files stay on it.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Pins
+        id: pins
+        run: echo "horizon=$(jq -r .horizon_revision horizon.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          repository: horizon-rust/horizon
+          ref: ${{ steps.pins.outputs.horizon }}
+          path: horizon-src
+          lfs: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            minecraft
+            horizon-src/target
+          key: exporters-${{ steps.pins.outputs.horizon }}
+          restore-keys: exporters-
+      - name: Minecraft from Mojang
+        run: python3 tools/fetch_minecraft.py horizon-src/research-lock.json minecraft
+      - name: Compile the exporters
+        working-directory: horizon-src
+        run: |
+          set -euo pipefail
+          cargo build --release --locked -p horizon-prepare
+          target/release/horizon-prepare --prepare --minecraft-dir "$GITHUB_WORKSPACE/minecraft" \
+            --server-jar "$GITHUB_WORKSPACE/minecraft/server/server-$(jq -r .minecraft.version research-lock.json).jar" \
+            --java-home "$JAVA_HOME" --root "$PWD"
+          bundle=$(target/release/horizon-prepare compile-exporters --root "$PWD" | tail -1)
+          mkdir -p "$GITHUB_WORKSPACE/exporters"
+          cp -R "$bundle/server" "$bundle/client" "$bundle/manifest.json" "$GITHUB_WORKSPACE/exporters/"
+          # Only Horizon's classes and their manifest leave this runner.
+          cd "$GITHUB_WORKSPACE"
+          stray=$(find exporters -type f ! -path exporters/manifest.json \
+            ! \( -name '*.class' \( -path 'exporters/server/dev/horizonlab/parity/*' -o -path 'exporters/client/dev/horizonlab/parity/*' \) \))
+          [ -z "$stray" ] || { echo "::error::not one of Horizon's classes: $stray"; exit 1; }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-exporters
+          path: exporters/
+          if-no-files-found: error
+
   build:
-    needs: test
+    needs: [test, exporters]
     strategy:
       fail-fast: false
       matrix:
@@ -86,6 +140,7 @@ jobs:
             ~/.cargo/git
             ~/.cargo/bin/horizon-mixins*
             stage-target
+            prepare-target
           key: ${{ matrix.name }}-${{ steps.pins.outputs.horizon }}-${{ hashFiles('mods/**') }}
           restore-keys: |
             ${{ matrix.name }}-${{ steps.pins.outputs.horizon }}-
@@ -94,6 +149,21 @@ jobs:
         shell: bash
         run: |
           command -v horizon-mixins || cargo install --locked --git https://github.com/horizon-rust/horizon-mixins --rev ${{ steps.pins.outputs.mixins }} horizon-mixins-cli
+      - name: Horizon's files beside the game
+        shell: bash
+        run: |
+          # What Horizon's own Nightly archive holds besides the programs (xtask's ARCHIVED), from
+          # the pinned commit, before stage.py takes the checkout's .git away.
+          mkdir -p horizon-dist/horizon-${{ matrix.name }}
+          git -C horizon-src archive --format=tar HEAD tools mods/horizon/src/test/java crates/horizon-prepare research-lock.json LICENSE packaging/PLAY.txt \
+            | tar x -C horizon-dist/horizon-${{ matrix.name }}
+          mv horizon-dist/horizon-${{ matrix.name }}/packaging/PLAY.txt horizon-dist/horizon-${{ matrix.name }}/PLAY.txt
+          rmdir horizon-dist/horizon-${{ matrix.name }}/packaging
+      - name: horizon-prepare
+        shell: bash
+        run: cargo build --manifest-path horizon-src/Cargo.toml --locked --profile release -p horizon-prepare --bin horizon-prepare
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/prepare-target
       - name: Apply the mods
         shell: bash
         run: python3 tools/stage.py horizon-src stage
@@ -119,10 +189,49 @@ jobs:
             --arg p "${{ matrix.name }}" --slurpfile mods mods.json \
             '{horizon_revision:$h, horizon_nightly:$n, minehouse_commit:$c, platform:$p, mods:$mods[0]}' > dist/minehouse-horizon.json
           cd dist && if [ "${{ runner.os }}" = Windows ]; then 7z a ../minehouse-horizon-${{ matrix.name }}.zip . ; else zip -r ../minehouse-horizon-${{ matrix.name }}.zip . ; fi
+      - uses: actions/download-artifact@v4
+        with:
+          name: horizon-exporters
+          path: horizon-dist/horizon-${{ matrix.name }}/exporters
+      - name: Package Horizon's files
+        # horizon-<rev12>-horizon-<platform>.zip (.tar.gz on Linux), laid out as Horizon's own
+        # Nightly archive; the launcher puts our horizon-client into it.
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp "prepare-target/release/horizon-prepare${{ matrix.exe }}" "horizon-dist/horizon-${{ matrix.name }}/"
+          rev=$(jq -r .horizon_revision horizon.json | cut -c1-12)
+          cd horizon-dist
+          case "${{ matrix.name }}" in
+            linux-*) tar czf "../horizon-$rev-horizon-${{ matrix.name }}.tar.gz" "horizon-${{ matrix.name }}" ;;
+            windows-*) 7z a -tzip "../horizon-$rev-horizon-${{ matrix.name }}.zip" "horizon-${{ matrix.name }}" > /dev/null ;;
+            *) zip -qr "../horizon-$rev-horizon-${{ matrix.name }}.zip" "horizon-${{ matrix.name }}" ;;
+          esac
+      - uses: actions/setup-java@v4
+        if: runner.os == 'Linux'
+        with:
+          distribution: temurin
+          java-version: '25'
+      - name: Prepare from the package (Linux)
+        # The launcher's own call, with the files packaged above: proves the exporters and the
+        # preparer fit together before a release ships them.
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p check && tar xzf horizon-*-horizon-${{ matrix.name }}.tar.gz -C check
+          python3 tools/fetch_minecraft.py horizon-src/research-lock.json minecraft > /dev/null
+          version=$(jq -r .minecraft.version horizon-src/research-lock.json)
+          check/horizon-${{ matrix.name }}/horizon-prepare --prepare --minecraft-dir "$PWD/minecraft" \
+            --server-jar "$PWD/minecraft/server/server-$version.jar" --java-home "$JAVA_HOME" \
+            --output "$PWD/check-resources" --complete --progress json | tail -3
+          check/horizon-${{ matrix.name }}/horizon-prepare --check --output "$PWD/check-resources"
       - uses: actions/upload-artifact@v4
         with:
           name: minehouse-horizon-${{ matrix.name }}
-          path: minehouse-horizon-${{ matrix.name }}.zip
+          path: |
+            minehouse-horizon-${{ matrix.name }}.zip
+            horizon-*-horizon-${{ matrix.name }}.*
 
   release:
     # A pushed v* tag, or a manual run with a v* `release` input (the tag is created on the run's commit).
@@ -139,5 +248,5 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ inputs.release || github.ref_name }}
         run: |
-          cd dist && sha256sum *.zip > SHA256SUMS
-          gh release create "${TAG}" *.zip SHA256SUMS --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" --title "MineHouse Horizon ${TAG}" --generate-notes
+          cd dist && sha256sum *.zip *.tar.gz > SHA256SUMS
+          gh release create "${TAG}" *.zip *.tar.gz SHA256SUMS --repo "${GITHUB_REPOSITORY}" --target "${GITHUB_SHA}" --title "MineHouse Horizon ${TAG}" --generate-notes

@@ -1,0 +1,22 @@
+diff --git a/crates/horizon-client/src/game/remote.rs b/crates/horizon-client/src/game/remote.rs
+index 1f15b46..5edca3d 100644
+--- a/crates/horizon-client/src/game/remote.rs
++++ b/crates/horizon-client/src/game/remote.rs
+@@ -6438,13 +6438,10 @@ impl Game<'_> {
+         let dead = self.screen == Screen::Dead;
+         // LivingEntity.isImmobile: a sleeper lies still in the bed.
+         let sleeping = self.sleeping;
+-        if let Some(head) = sleeping {
+-            player.position = Vec3::new(
+-                f64::from(head[0]) + 0.5,
+-                // setPosToBed: the bed's top (getSleepHeight) and 0.125 above it.
+-                f64::from(head[1]) + 0.5625 + 0.125,
+-                f64::from(head[2]) + 0.5,
+-            );
++        if sleeping.is_some() {
++            // setPosToBed ran once, when SLEEPING_POS arrived; after it the
++            // sleeper stays where the server puts them (a lying player whose
++            // bed is out of sight is teleported back to where they lay).
+             player.velocity = Vec3::ZERO;
+             player.pitch = 0.0;
+         } else if !dead && !riding {
