@@ -160,7 +160,7 @@ jobs:
             cargo install --locked --path mixins-src/crates/horizon-mixins-cli --root mixins-bin
             echo "$stamp" > mixins-bin/stamp
           fi
-          echo "$PWD/mixins-bin/bin" >> "$GITHUB_PATH"
+          echo "${{ github.workspace }}/mixins-bin/bin" >> "$GITHUB_PATH"
       - name: Horizon's files beside the game
         shell: bash
         run: |
