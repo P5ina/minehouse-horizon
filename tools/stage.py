@@ -13,6 +13,11 @@ def main():
     p.add_argument("--mixins", default="horizon-mixins", help="the horizon-mixins CLI")
     a = p.parse_args()
     cfg = json.loads((ROOT / "horizon.json").read_text())
+    # Our fixes to Horizon itself (patches/*.patch, `git diff` against horizon.json's revision),
+    # before the mods: a mod's target may be a function a patch changes.
+    for patch in sorted((ROOT / "patches").glob("*.patch")):
+        print(f"Applying {patch.name}")
+        subprocess.run(["git", "apply", "--whitespace=nowarn", str(patch)], cwd=a.source, check=True)
     # As the launcher's source archive: no links (horizon-mixins refuses them) and no .git.
     shutil.rmtree(a.source / ".git", ignore_errors=True)
     for path in list(a.source.rglob("*")):

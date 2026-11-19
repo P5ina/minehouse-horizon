@@ -19,7 +19,15 @@ the MineHouse launcher and never compile anything.
 | Controlling | `mods/controlling` | nothing: client only (Key Binds search) |
 | MineHouse | `mods/minehouse` | MineHouse's server mods: the wardrobe (O), the anvil's real cost, the spawn zones' borders |
 
-- `horizon.json` pins the Horizon commit (and the Nightly whose files the build reuses) and horizon-mixins.
+- `horizon.json` pins the Horizon commit (and the Nightly it came from) and horizon-mixins.
+- `patches/*.patch`: our fixes to Horizon itself (`git diff` against the pinned commit), applied
+  before the mods. `0001`: a sleeper keeps the position the server sends (`/lay` showed the world
+  from under it).
+- Horizon deletes a dated Nightly after a few days, so CI builds Horizon's other files for the
+  pinned commit itself: `horizon-prepare` and the Java exporters (compiled against Minecraft
+  downloaded from Mojang on the runner by `tools/fetch_minecraft.py`; only Horizon's classes leave
+  it). A release carries them as `horizon-<rev12>-horizon-<platform>.zip` (`.tar.gz` on Linux),
+  laid out as Horizon's own archive, and the launcher takes them from there.
 - `.github/workflows/build.yml` applies the mods with horizon-mixins (`tools/stage.py`) and compiles
   `horizon-client` as the Horizon launcher's native build does. A `v*` tag publishes a release.
 - Developing locally: copy the `mixins/<id>` folders into one folder and run
