@@ -2,7 +2,7 @@
 // read, so the next tick starts the run. Shift trades a damageable result too.
 fn fasttrading_press(
     game: &crate::game::Game<'_>,
-    screen: &horizon_client::mod_api::NativeScreenView<'_>,
+    screen: &crate::game::native_hooks::NativeScreenView<'_>,
     button: i32,
     modifiers: u32,
     canceled: &mut bool,

@@ -3,10 +3,10 @@
 // proxy moving us on) starts clean.
 fn minehouse_packet(
     game: &mut crate::game::Game<'_>,
-    packet: &horizon_client::mod_api::ClientboundPlayPacket,
+    packet: &horizon_protocol::packets::play::Clientbound,
 ) {
     use crate::game::minehouse as m;
-    use horizon_client::mod_api::ClientboundPlayPacket as C;
+    use horizon_protocol::packets::play::Clientbound as C;
     match packet {
         C::Login(_) => {
             m::with(|s| s.left_server());

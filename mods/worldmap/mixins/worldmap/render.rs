@@ -4,7 +4,7 @@
 fn worldmap_render(
     game: &crate::game::Game<'_>,
     batch: &mut horizon_client::hud::HudBatch,
-    screen: &horizon_client::mod_api::NativeScreenView<'_>,
+    screen: &crate::game::native_hooks::NativeScreenView<'_>,
 ) {
     use crate::game::worldmap as m;
     if game.native_mod_screen() != Some(m::ID) {
@@ -17,7 +17,7 @@ fn worldmap_render(
     };
     let (w, h, per) = m::image_size(shown);
     game.native_fill(batch, [0.0, 0.0, size[0], size[1]], 0xFF0E0E12);
-    game.native_sprite(
+    game.mh_sprite(
         batch,
         horizon_client::hud::MOD_IMAGE_SPRITE,
         [0.0, m::IMAGE_Y as f32, w as f32, h as f32],
@@ -41,7 +41,7 @@ fn worldmap_render(
         }
         game.native_fill(batch, [x - 2.5, y - 2.5, 5.0, 5.0], 0xFF000000);
         game.native_fill(batch, [x - 1.5, y - 1.5, 3.0, 3.0], 0xFF55FF55);
-        let tw = game.native_text_width(name);
+        let tw = game.mh_text_width(name);
         game.native_fill(batch, [x - tw / 2.0 - 1.0, y - 13.0, tw + 2.0, 10.0], 0x80000000);
         game.native_text(batch, name, [x - tw / 2.0, y - 12.0], 0xFFFFFF, false);
     }
@@ -72,17 +72,17 @@ fn worldmap_render(
     // Texts.
     let russian = horizon_client::lang::code().starts_with("ru");
     let title = m::tr(russian, "title");
-    let tw = game.native_text_width(title);
+    let tw = game.mh_text_width(title);
     game.native_fill(batch, [size[0] / 2.0 - tw / 2.0 - 4.0, 4.0, tw + 8.0, 13.0], 0x90000000);
     game.native_text(batch, title, [size[0] / 2.0 - tw / 2.0, 7.0], 0xFFFFFF, true);
     let (bx, bz) = view.block_at(screen.mouse, size);
     let coords = format!("X: {}  Z: {}", bx.floor() as i64, bz.floor() as i64);
     let hint = m::tr(russian, "hint");
     let y = size[1] - 14.0;
-    let cw = game.native_text_width(&coords);
+    let cw = game.mh_text_width(&coords);
     game.native_fill(batch, [2.0, y - 3.0, cw + 8.0, 13.0], 0x90000000);
     game.native_text(batch, &coords, [6.0, y], 0xFFFFFF, true);
-    let hw = game.native_text_width(hint);
+    let hw = game.mh_text_width(hint);
     game.native_fill(batch, [size[0] - hw - 10.0, y - 3.0, hw + 8.0, 13.0], 0x90000000);
     game.native_text(batch, hint, [size[0] - hw - 6.0, y], 0xC0C0C0, true);
 }

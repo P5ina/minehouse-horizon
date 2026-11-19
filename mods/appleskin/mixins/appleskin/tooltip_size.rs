@@ -15,6 +15,6 @@ fn appleskin_tooltip_size(
     }
     let t = m::TooltipFood::new(m::Food { nutrition: nutrition as i32, saturation, rotten: false, regeneration: None });
     if t.shown() {
-        *size = Some([t.width(|s| game.native_text_width(s)), m::TooltipFood::HEIGHT]);
+        *size = Some([t.width(|s| game.mh_text_width(s)), m::TooltipFood::HEIGHT]);
     }
 }

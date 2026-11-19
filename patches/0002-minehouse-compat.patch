@@ -1,0 +1,1081 @@
+diff --git a/crates/horizon-client-render/src/options_ui/layout.rs b/crates/horizon-client-render/src/options_ui/layout.rs
+index 5c8a64125..fea558582 100644
+--- a/crates/horizon-client-render/src/options_ui/layout.rs
++++ b/crates/horizon-client-render/src/options_ui/layout.rs
+@@ -91,7 +91,7 @@ impl OptionsUi {
+         let mut rows = ListRows::default();
+         let page = self.page();
+         let cx = (w / 2.0).floor();
+-        if matches!(
++        if ::std::matches!(
+             page,
+             Page::Video | Page::Controls | Page::KeyBinds | Page::ModBrowser
+         ) {
+@@ -287,7 +287,7 @@ impl OptionsUi {
+                         last_category = category;
+                         rows.begin(&out, y);
+                         let label =
+-                            Text::translate(&format!("key.category.minecraft.{category}"), &[])
++                            Text::translate(&::std::format!("key.category.minecraft.{category}"), &[])
+                                 .with_style(&Style {
+                                     bold: Some(true),
+                                     underlined: Some(true),
+@@ -557,12 +557,12 @@ impl OptionsUi {
+             // Drawn by `pack_screen` and `mods_screen`.
+             Page::Packs | Page::Mods => {}
+             _ => {
+-                if matches!(page, Page::Video | Page::Controls | Page::ModBrowser) {
++                if ::std::matches!(page, Page::Video | Page::Controls | Page::ModBrowser) {
+                     top = 38.0;
+                 }
+                 out.push(Widget {
+                     x: 0.0,
+-                    y: if matches!(page, Page::Video | Page::Controls | Page::ModBrowser) {
++                    y: if ::std::matches!(page, Page::Video | Page::Controls | Page::ModBrowser) {
+                         4.0
+                     } else {
+                         12.0
+diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
+index 57c062262..cd1a9a3f6 100644
+--- a/crates/horizon-client/src/game.rs
++++ b/crates/horizon-client/src/game.rs
+@@ -643,7 +643,13 @@ struct FallingBlock {
+     /// The UUID and compound it was loaded with, kept while it moves.
+     saved: Option<Box<([i32; 4], horizon_core::nbt::Tag)>>,
+ }
+-horizon_mod_runtime::impl_attachment_lifetime!(FallingBlock);
++// MineHouse: written out (`impl_attachment_lifetime!`), so horizon-mixins can tell which
++// standard macros `game`'s functions call.
++impl horizon_mod_runtime::attachments::HasAttachmentLifetime for FallingBlock {
++    fn attachment_lifetime(&mut self) -> &mut horizon_mod_runtime::attachments::AttachmentLifetime {
++        &mut self.attachment_lifetime
++    }
++}
+ 
+ impl FallingBlock {
+     /// Where `FallingBlockRenderer` draws the block's model corner, `alpha`
+diff --git a/crates/horizon-client/src/game/blocks/stations/draw.rs b/crates/horizon-client/src/game/blocks/stations/draw.rs
+index 4432de68f..ab113ab17 100644
+--- a/crates/horizon-client/src/game/blocks/stations/draw.rs
++++ b/crates/horizon-client/src/game/blocks/stations/draw.rs
+@@ -133,7 +133,7 @@ impl Game<'_> {
+                     let (sx, sy) = self.station_slot_position(i).unwrap_or_default();
+                     batch.sprite(
+                         &self.gui.atlas,
+-                        &format!("gui/sprites/container/slot/{icon}"),
++                        &::std::format!("gui/sprites/container/slot/{icon}"),
+                         ox + sx,
+                         oy + sy,
+                     );
+@@ -231,7 +231,7 @@ impl Game<'_> {
+                             );
+                             batch.sprite(
+                                 atlas,
+-                                &format!(
++                                &::std::format!(
+                                     "gui/sprites/container/enchanting_table/level_{}_disabled",
+                                     i + 1
+                                 ),
+@@ -258,7 +258,7 @@ impl Game<'_> {
+                             };
+                             batch.sprite_scaled(
+                                 atlas,
+-                                &format!("gui/sprites/container/enchanting_table/{sprite}"),
++                                &::std::format!("gui/sprites/container/enchanting_table/{sprite}"),
+                                 ox + bx,
+                                 oy + by,
+                                 bw,
+@@ -267,7 +267,7 @@ impl Game<'_> {
+                             );
+                             batch.sprite(
+                                 atlas,
+-                                &format!("gui/sprites/container/enchanting_table/level_{}", i + 1),
++                                &::std::format!("gui/sprites/container/enchanting_table/level_{}", i + 1),
+                                 ox + bx + 1.0,
+                                 oy + by + 1.0,
+                             );
+@@ -302,7 +302,7 @@ impl Game<'_> {
+                                 .translate_with_fallback("container.enchant.clue", "%s . . . ?")
+                                 .replace("%s", &name);
+                             let mut lines =
+-                                vec![(horizon_client::text::Text::literal(clue), u32::MAX)];
++                                ::std::vec![(horizon_client::text::Text::literal(clue), u32::MAX)];
+                             if !self.creative {
+                                 lines.push((horizon_client::text::Text::literal(""), u32::MAX));
+                                 if level < cost {
+@@ -368,7 +368,7 @@ impl Game<'_> {
+                     };
+                     batch.sprite_scaled(
+                         atlas,
+-                        &format!("gui/sprites/container/anvil/{field}"),
++                        &::std::format!("gui/sprites/container/anvil/{field}"),
+                         ox + 59.0,
+                         oy + 20.0,
+                         110.0,
+@@ -453,7 +453,7 @@ impl Game<'_> {
+                         for (icon, alpha) in cycling.shown(partial) {
+                             batch.sprite_scaled(
+                                 atlas,
+-                                &format!("gui/sprites/container/slot/{icon}"),
++                                &::std::format!("gui/sprites/container/slot/{icon}"),
+                                 ox + sx,
+                                 oy + sy,
+                                 16.0,
+@@ -504,7 +504,7 @@ impl Game<'_> {
+                                 "armor_trim"
+                             };
+                             let what = if slot == 1 { "base" } else { "additions" };
+-                            let key = format!(
++                            let key = ::std::format!(
+                                 "item.minecraft.smithing_template.{name}.{what}_slot_description"
+                             );
+                             onboarding = Some(self.translate_with_fallback(&key, &key));
+@@ -536,7 +536,7 @@ impl Game<'_> {
+                     };
+                     batch.sprite(
+                         atlas,
+-                        &format!("gui/sprites/container/stonecutter/{scroller}"),
++                        &::std::format!("gui/sprites/container/stonecutter/{scroller}"),
+                         ox + 119.0,
+                         oy + 15.0 + (41.0 * offs).floor(),
+                     );
+@@ -573,7 +573,7 @@ impl Game<'_> {
+                             };
+                             batch.sprite_scaled(
+                                 &self.gui.atlas,
+-                                &format!("gui/sprites/container/stonecutter/{sprite}"),
++                                &::std::format!("gui/sprites/container/stonecutter/{sprite}"),
+                                 ox + x,
+                                 oy + y - 1.0,
+                                 16.0,
+diff --git a/crates/horizon-client/src/game/interface/extras.rs b/crates/horizon-client/src/game/interface/extras.rs
+index 12c09ac36..288c96e5f 100644
+--- a/crates/horizon-client/src/game/interface/extras.rs
++++ b/crates/horizon-client/src/game/interface/extras.rs
+@@ -43,6 +43,7 @@ impl Game<'_> {
+     }
+     /// Mouse buttons while playing, for mods' clicks.
+     pub(super) fn extras_mouse(&mut self, button: MouseButton, pressed: bool) {
++        self.mh_mouse_event(button, pressed);
+         let i = match button {
+             MouseButton::Left => 0,
+             MouseButton::Right => 1,
+@@ -69,6 +70,7 @@ impl Game<'_> {
+         self.extras.fps.record(now, elapsed.as_secs_f32() * 1000.0);
+         let (world_partial_tick, partial_tick) = self.frame_partial_ticks();
+         self.extras.frame_partial_ticks = Some((world_partial_tick, partial_tick));
++        self.native_frame(elapsed);
+         self.native_render_frame_pre(elapsed, world_partial_tick, partial_tick);
+         // A clear a mod asked for (in this frame's `RenderFrameEvent.Pre`, or after the last
+         // frame was drawn) lands before this frame's particles are drawn, paused or not.
+@@ -217,6 +219,7 @@ impl Game<'_> {
+             extras_hud::draw_minimap(batch, atlas, &mut corners, &look);
+         }
+         self.draw_pvp_hud(batch, &mut corners);
++        self.native_hud(batch, &mut corners);
+         self.native_render_gui_post(batch, &mut corners);
+     }
+     /// The height the status effect icons take at the top right
+diff --git a/crates/horizon-client/src/game/modding/native_custom_geometry.rs b/crates/horizon-client/src/game/modding/native_custom_geometry.rs
+index 90350149d..b12a6b736 100644
+--- a/crates/horizon-client/src/game/modding/native_custom_geometry.rs
++++ b/crates/horizon-client/src/game/modding/native_custom_geometry.rs
+@@ -74,6 +74,7 @@ impl Game<'_> {
+         if title {
+             return;
+         }
++        self.mh_world(camera, alpha, draw, entities);
+         draw.set_model_cut(entities.len() as u32);
+         // Seconds of game time, wrapping every hour (72,000 ticks) so f32 keeps sub-tick steps.
+         draw.set_time(((self.world.game_time.rem_euclid(72_000) as f64 + alpha) / 20.0) as f32);
+diff --git a/crates/horizon-client/src/game/modding/native_key_mappings.rs b/crates/horizon-client/src/game/modding/native_key_mappings.rs
+index e0bf5fcf5..bbbbec705 100644
+--- a/crates/horizon-client/src/game/modding/native_key_mappings.rs
++++ b/crates/horizon-client/src/game/modding/native_key_mappings.rs
+@@ -57,6 +57,7 @@ impl Game<'_> {
+             };
+             self.mod_mappings_input(name, action, false);
+         }
++        self.mh_key_event(key, action);
+         let key = key.unwrap_or("key.keyboard.unknown");
+         self.native_input_key(key, layout_key, raw_code, action, modifiers);
+     }
+diff --git a/crates/horizon-client/src/game/native_hooks/base.rs b/crates/horizon-client/src/game/native_hooks/base.rs
+index ec60171c5..3096c526d 100644
+--- a/crates/horizon-client/src/game/native_hooks/base.rs
++++ b/crates/horizon-client/src/game/native_hooks/base.rs
+@@ -824,6 +824,7 @@ impl Game<'_> {
+         canceled: &mut bool,
+     ) {
+         self.fire_mouse_scrolling(scroll, accumulated, buttons, cursor, modifiers, canceled);
++        self.mh_wheel(accumulated, canceled);
+     }
+     /// A command typed or clicked in chat, without its slash, before the
+     /// server and Horizon's commands see it: set `ran` when the mod ran it.
+@@ -841,6 +842,7 @@ impl Game<'_> {
+         commands: &mut Vec<mod_api::Command>,
+     ) {
+         self.fire_register_client_commands(commands);
++        self.mh_commands(commands);
+     }
+     /// World field of view, after normal calculation and zoom and before projection/Nausea.
+     /// Called for world rendering and near-plane overlays; hand/HUD FOV uses its own path.
+diff --git a/crates/horizon-client/src/game/native_hooks/minehouse_compat.rs b/crates/horizon-client/src/game/native_hooks/minehouse_compat.rs
+new file mode 100644
+index 000000000..5c106c026
+--- /dev/null
++++ b/crates/horizon-client/src/game/native_hooks/minehouse_compat.rs
+@@ -0,0 +1,732 @@
++//! MineHouse: the hook points and host calls MineHouse's mods were written against (Horizon
++//! 9f42064, before the native and wasm mod APIs merged), on top of this Horizon's own. One file,
++//! plus a call at each place the old points fired, so that moving to a newer Horizon only
++//! moves this patch.
++#![allow(dead_code)]
++use super::*;
++use horizon_client::block_entity_render::{BeamShape, beam};
++use horizon_client::gizmos::{self, Gizmos, Line};
++use horizon_client::mesher::Vertex;
++use horizon_client::world_geometry::WorldGeometry;
++use horizon_client::world_primitives::{
++    MAX_BEAM_HEIGHT, PrimitiveShape, WorldPrimitives, text_unit, vertex_color,
++};
++use std::borrow::Cow;
++use std::collections::HashSet;
++use std::sync::Mutex;
++
++/// A mod's row in Options > Mods (`native_mods`).
++#[derive(Clone, Debug, Default, PartialEq)]
++pub struct NativeMod {
++    /// Its id: its settings folder and its keys' lines.
++    pub id: String,
++    /// `Name 1.0`.
++    pub title: String,
++    pub description: String,
++    /// Its keys: name, label and default key (`key.keyboard.z`).
++    pub keys: Vec<[String; 3]>,
++}
++
++pub type NativeScreenView<'a> = ScreenView<'a>;
++pub type NativeZoom = mod_api::Zoom;
++pub type NativeMinimap = mod_api::Minimap;
++pub type NativeCamera = mod_api::Camera;
++pub type NativeClock = mod_api::Clock;
++
++/// What covers the world.
++#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
++pub enum NativeScreenKind {
++    #[default]
++    Playing,
++    Chat,
++    Death,
++    Other,
++}
++
++/// The world this window plays: a save's folder, or a server's address.
++#[derive(Clone, Debug, PartialEq, Eq, Hash)]
++pub enum NativeWorldId {
++    Singleplayer(String),
++    Server(String),
++}
++
++/// This window's state.
++#[derive(Clone, Debug)]
++pub struct NativeClientState {
++    pub focused: bool,
++    pub gui_hidden: bool,
++    pub gui_size: [f32; 2],
++    pub server_address: Option<String>,
++    pub logged_in: bool,
++    pub yaw: f32,
++    pub pitch: f32,
++    pub screen: NativeScreenKind,
++    pub debug_screen: bool,
++    pub world: Option<NativeWorldId>,
++}
++
++/// A living entity the client knows.
++#[derive(Clone, Debug, Default)]
++pub struct NativeClientEntity {
++    pub id: u32,
++    pub player_uuid: Option<u128>,
++    pub player_name: Option<String>,
++    pub position: [f64; 3],
++    pub previous_position: [f64; 3],
++    pub bounds: [[f64; 3]; 2],
++    pub height: f32,
++    pub head_yaw: f32,
++    pub head_pitch: f32,
++    pub alive: bool,
++    pub invisible: bool,
++    pub kind: String,
++    pub yaw: f32,
++    pub baby: bool,
++    pub spectator: bool,
++    pub texture: Option<String>,
++}
++
++/// A dropped item the client knows.
++#[derive(Clone, Debug)]
++pub struct NativeClientItem {
++    pub id: u32,
++    pub stack: ItemStack,
++    pub position: [f64; 3],
++    pub previous_position: [f64; 3],
++}
++
++/// Blocks drawn in the world (`native_world_submit`): a pose stack from the camera, and the
++/// vertices the drawn blocks leave.
++pub struct NativeWorldDraw {
++    pub camera: [f64; 3],
++    pub partial: f32,
++    pub game_time: i64,
++    pub light: u32,
++    poses: Vec<glam::Mat4>,
++    vertices: Vec<Vertex>,
++}
++
++impl NativeWorldDraw {
++    fn new(camera: [f64; 3], partial: f32, game_time: i64) -> Self {
++        Self {
++            camera,
++            partial,
++            game_time,
++            light: 0xF0_F0,
++            poses: vec![glam::Mat4::IDENTITY],
++            vertices: Vec::new(),
++        }
++    }
++    pub fn push(&mut self) {
++        let top = *self.poses.last().expect("a pose");
++        self.poses.push(top);
++    }
++    pub fn pop(&mut self) {
++        if self.poses.len() > 1 {
++            self.poses.pop();
++        }
++    }
++    pub fn pose(&self) -> glam::Mat4 {
++        *self.poses.last().expect("a pose")
++    }
++    /// Move the pose to the world position `at`: false when it is not finite.
++    pub fn translate_world(&mut self, at: [f64; 3]) -> bool {
++        let offset: [f64; 3] = std::array::from_fn(|i| at[i] - self.camera[i]);
++        if offset.iter().any(|v| !v.is_finite()) {
++            return false;
++        }
++        let top = self.poses.last_mut().expect("a pose");
++        *top *= glam::Mat4::from_translation(glam::DVec3::from_array(offset).as_vec3());
++        true
++    }
++}
++
++/// The ids of the mods the old `native_mods` listed, whose pages are buttons.
++static COMPAT_MODS: Mutex<Option<HashSet<String>>> = Mutex::new(None);
++
++fn compat_mod(id: &str) -> bool {
++    COMPAT_MODS
++        .lock()
++        .unwrap()
++        .as_ref()
++        .is_some_and(|ids| ids.contains(id))
++}
++
++/// The old hook points: MineHouse's mods inject into these.
++impl Game<'_> {
++    /// A key or mouse button went down or up, by its vanilla name (`key.keyboard.z`,
++    /// `key.mouse.left`): keys on any screen, mouse buttons while playing. No repeats.
++    pub(in crate::game) fn native_key(&mut self, key: &str, pressed: bool) {
++        let _ = (key, pressed);
++    }
++    /// Options > Mods lists the native mods: push yours.
++    pub(in crate::game) fn native_mods(&mut self, mods: &mut Vec<NativeMod>) {
++        let _ = mods;
++    }
++    /// The buttons of mod `mod_id`'s settings page: push their labels when it is yours.
++    pub(in crate::game) fn native_settings(&mut self, mod_id: &str, buttons: &mut Vec<String>) {
++        let _ = (mod_id, buttons);
++    }
++    /// Button `button` of mod `mod_id`'s settings page was clicked.
++    pub(in crate::game) fn native_settings_click(&mut self, mod_id: &str, button: usize) {
++        let _ = (mod_id, button);
++    }
++    /// The client commands `native_command` runs, without their slash.
++    pub(in crate::game) fn native_commands(&mut self, commands: &mut Vec<&'static str>) {
++        let _ = commands;
++    }
++    /// Once a frame, in a world or not.
++    pub(in crate::game) fn native_frame(&mut self, elapsed: Duration) {
++        let _ = elapsed;
++    }
++    /// The HUD (not drawn under F1): place a box with `corners.place`.
++    pub(in crate::game) fn native_hud(&mut self, batch: &mut HudBatch, corners: &mut Corners) {
++        let _ = (batch, corners);
++    }
++    /// Wheel steps while playing: set `claimed` to keep them from the hotbar.
++    pub(in crate::game) fn native_wheel(&mut self, steps: f32, claimed: &mut bool) {
++        let _ = (steps, claimed);
++    }
++    /// Lines, boxes, beams and text in the world, this frame.
++    pub(in crate::game) fn native_world_primitives(
++        &self,
++        partial: f32,
++        camera: [f64; 3],
++        primitives: &mut WorldPrimitives,
++    ) {
++        let _ = (partial, camera, primitives);
++    }
++    /// A decoded play packet from the server, just before the game handles it.
++    pub(in crate::game) fn native_client_play_packet(
++        &mut self,
++        packet: &horizon_protocol::packets::play::Clientbound,
++    ) {
++        let _ = packet;
++    }
++    /// A chat line from the server about to show: replace `message` to change it. `sender` is
++    /// the player's UUID, 0 for system lines; `overlay` is an action bar line.
++    pub(in crate::game) fn native_chat_received(
++        &mut self,
++        overlay: bool,
++        sender: u128,
++        message: &mut horizon_client::text::Text,
++    ) {
++        let _ = (overlay, sender, message);
++    }
++    /// Blocks drawn in the world, this frame (`native_world_draw_block`).
++    pub(in crate::game) fn native_world_submit(&self, draw: &mut NativeWorldDraw) {
++        let _ = draw;
++    }
++}
++
++/// Where the old points fire, called from this Horizon's own code.
++impl Game<'_> {
++    /// A window or control socket key, for `native_key`.
++    pub(in crate::game) fn mh_key_event(&mut self, key: Option<&str>, action: mod_api::KeyAction) {
++        let Some(key) = key else {
++            return;
++        };
++        match action {
++            mod_api::KeyAction::Press => self.native_key(key, true),
++            mod_api::KeyAction::Release => self.native_key(key, false),
++            mod_api::KeyAction::Repeat => {}
++        }
++    }
++    /// A mouse button while playing, for `native_key`.
++    pub(in crate::game) fn mh_mouse_event(&mut self, button: MouseButton, pressed: bool) {
++        let name = keybinds::mouse_name(button);
++        self.native_key(&name, pressed);
++    }
++    /// `native_commands`' names, as this Horizon's client commands.
++    pub(in crate::game) fn mh_commands(&mut self, commands: &mut Vec<mod_api::Command>) {
++        let mut names = Vec::new();
++        self.native_commands(&mut names);
++        for name in names {
++            commands.push(mod_api::Command::new(name));
++        }
++    }
++    /// Gameplay scrolling, for `native_wheel`.
++    pub(in crate::game) fn mh_wheel(&mut self, accumulated: [i32; 2], canceled: &mut bool) {
++        if accumulated[1] == 0 {
++            return;
++        }
++        let mut claimed = false;
++        self.native_wheel(accumulated[1] as f32, &mut claimed);
++        if claimed {
++            *canceled = true;
++        }
++    }
++    /// Options > Mods: the rows `native_mods` lists, their keys and buttons.
++    pub(in crate::game) fn mh_list_mods(&mut self) {
++        let mut mods = Vec::new();
++        self.native_mods(&mut mods);
++        *COMPAT_MODS.lock().unwrap() = Some(mods.iter().map(|m| m.id.clone()).collect());
++        self.settings
++            .mods
++            .installed
++            .retain(|row| !mods.iter().any(|m| m.id == row.id));
++        for m in mods {
++            let mappings = m
++                .keys
++                .iter()
++                .map(|[id, label, key]| KeyMapping {
++                    id: id.clone(),
++                    label: label.clone(),
++                    key: key.clone(),
++                    modifiers: 0,
++                    context: Default::default(),
++                    category: String::new(),
++                })
++                .collect();
++            let settings = self.mh_buttons(&m.id);
++            self.settings.mods.installed.push(Installed {
++                id: m.id,
++                title: m.title,
++                description: m.description,
++                problem: None,
++                dev: false,
++                native: Some(NativePage { mappings, settings }),
++            });
++        }
++    }
++    /// A compat mod's buttons as one-option choices: a click on one is the button's click.
++    fn mh_buttons(&mut self, mod_id: &str) -> Vec<NativeSetting> {
++        let mut buttons = Vec::new();
++        self.native_settings(mod_id, &mut buttons);
++        buttons
++            .into_iter()
++            .enumerate()
++            .map(|(i, label)| NativeSetting {
++                key: format!("button.{i}"),
++                label: label.clone(),
++                tooltip: None,
++                value: NativeSettingValue::Choice {
++                    options: vec![label],
++                    index: 0,
++                },
++            })
++            .collect()
++    }
++    /// Setting `j` of row `i` changed: a compat mod's button click. True when it was one.
++    pub(in crate::game) fn mh_setting_event(&mut self, i: usize, j: usize) -> bool {
++        let Some(id) = self.settings.mods.installed.get(i).map(|m| m.id.clone()) else {
++            return false;
++        };
++        if !compat_mod(&id) {
++            return false;
++        }
++        self.native_settings_click(&id, j);
++        self.mh_settings_refresh(i);
++        true
++    }
++    /// Row `i`'s page opened or was clicked: a compat mod's labels asked again. True when it
++    /// was one.
++    pub(in crate::game) fn mh_settings_refresh(&mut self, i: usize) -> bool {
++        let Some(id) = self.settings.mods.installed.get(i).map(|m| m.id.clone()) else {
++            return false;
++        };
++        if !compat_mod(&id) {
++            return false;
++        }
++        let settings = self.mh_buttons(&id);
++        if let Some(page) = self
++            .settings
++            .mods
++            .installed
++            .get_mut(i)
++            .and_then(|m| m.native.as_mut())
++        {
++            page.settings = settings;
++        }
++        true
++    }
++    /// The world draws: the old points' primitives and blocks.
++    pub(in crate::game) fn mh_world(
++        &mut self,
++        camera: [f64; 3],
++        alpha: f64,
++        draw: &mut WorldGeometry,
++        entities: &mut Vec<Vertex>,
++    ) {
++        let mut blocks = NativeWorldDraw::new(camera, alpha as f32, self.world.game_time);
++        self.native_world_submit(&mut blocks);
++        entities.extend(blocks.vertices);
++        let mut primitives = WorldPrimitives::default();
++        self.native_world_primitives(alpha as f32, camera, &mut primitives);
++        if primitives.is_empty() {
++            return;
++        }
++        let (quads, lines, view) = draw.raw();
++        self.mh_tessellate(&primitives, glam::DVec3::from_array(camera), alpha, view, quads, lines);
++    }
++    /// Draws block `block` in the state with `properties` under `draw`'s pose. False for an
++    /// unknown block or property.
++    pub(in crate::game) fn native_world_draw_block(
++        &self,
++        draw: &mut NativeWorldDraw,
++        block: &str,
++        properties: &[(&str, &str)],
++    ) -> bool {
++        let registry = &self.pack.assets.registry;
++        let Some(mut state) = registry
++            .default_state(block)
++            .and_then(|id| registry.state(id))
++            .cloned()
++        else {
++            return false;
++        };
++        for (key, value) in properties {
++            match state.properties.get_mut(*key) {
++                Some(v) => *v = (*value).to_owned(),
++                None => return false,
++            }
++        }
++        let Some(id) = registry.id(&state) else {
++            return false;
++        };
++        let pose = draw.pose();
++        self.block_model_vertices(id, 42, pose, draw.light, true, &mut draw.vertices);
++        true
++    }
++    fn mh_tessellate(
++        &mut self,
++        primitives: &WorldPrimitives,
++        camera: glam::DVec3,
++        alpha: f64,
++        view: glam::Mat4,
++        out_quads: &mut [Vec<Vertex>; 2],
++        out_lines: &mut [Vec<[f32; 8]>; 2],
++    ) {
++        let atlas = &self.gui.atlas;
++        let white = horizon_client::gfx::lightning::white_uv(&atlas.font.white());
++        let beam_sprite = atlas.sprites.get("entity/beacon/beacon_beam").copied();
++        let time = self.world.game_time.rem_euclid(40) as f32 + alpha as f32;
++        let relative = |p: [f64; 3]| (glam::DVec3::from_array(p) - camera).as_vec3();
++        let mut lines: [Vec<Line>; 2] = Default::default();
++        let mut texts = Vec::new();
++        for primitive in primitives.iter() {
++            let through = usize::from(primitive.through_walls);
++            let quads = &mut out_quads[through];
++            match &primitive.shape {
++                PrimitiveShape::Line {
++                    from,
++                    to,
++                    color,
++                    width,
++                } if finite(from) && finite(to) && width.is_finite() => {
++                    lines[through].push(Line {
++                        start: *from,
++                        end: *to,
++                        color: *color,
++                        width: *width,
++                    });
++                }
++                PrimitiveShape::BoxOutline {
++                    min,
++                    max,
++                    color,
++                    width,
++                } if finite(min) && finite(max) && width.is_finite() => {
++                    let mut edges = Gizmos::default();
++                    edges.cuboid(*min, *max, *color, *width);
++                    lines[through].extend(edges.lines);
++                }
++                PrimitiveShape::FilledBox { min, max, color } if finite(min) && finite(max) => {
++                    let color = vertex_color(*color, 255);
++                    for quad in gizmos::cuboid_fill_quads(*min, *max) {
++                        quads.extend(quad.map(|corner| plain(relative(corner), white, color)));
++                    }
++                }
++                PrimitiveShape::Beam {
++                    base,
++                    height,
++                    color,
++                } if finite(base) => {
++                    let Some(sprite) = beam_sprite else {
++                        continue;
++                    };
++                    let corner = relative(*base) - glam::Vec3::new(0.5, 0.0, 0.5);
++                    let start = quads.len();
++                    beam(
++                        glam::Mat4::from_translation(corner),
++                        BeamShape {
++                            scale: 1.0,
++                            time,
++                            start: 0,
++                            height: (*height).min(MAX_BEAM_HEIGHT) as i32,
++                            color: color & 0xFF_FFFF,
++                            solid_radius: 0.2,
++                            glow_radius: 0.25,
++                        },
++                        sprite,
++                        quads,
++                    );
++                    for v in &mut quads[start..] {
++                        let a = (v.color >> 24) * (color >> 24) / 255;
++                        v.color = a << 24 | v.color & 0xFF_FFFF;
++                    }
++                }
++                PrimitiveShape::Text {
++                    at,
++                    text,
++                    color,
++                    scale,
++                    scale_with_distance,
++                    background,
++                } if finite(at) => {
++                    let o = glam::DVec3::from_array(*at) - camera;
++                    let unit = text_unit(*scale, *scale_with_distance, o.length());
++                    if unit > 0.0 {
++                        texts.push((through, o, text.clone(), *color, unit, *background));
++                    }
++                }
++                _ => {}
++            }
++        }
++        for (through, o, text, color, unit, background) in texts {
++            let line = [(
++                Text::colored(text, color & 0xFF_FFFF),
++                f64::from(unit * 4.5),
++            )];
++            let patches = self.name_tag_quads(
++                o,
++                &line,
++                color >> 24,
++                background,
++                0,
++                0,
++                unit,
++                &mut out_quads[through],
++            );
++            self.map_patches.extend(patches);
++        }
++        let at = camera.to_array();
++        for (i, lines) in lines.iter().enumerate() {
++            out_lines[i].extend(gizmos::camera_relative(lines, at, view));
++        }
++    }
++}
++
++fn finite(p: &[f64; 3]) -> bool {
++    p.iter().all(|v| v.is_finite())
++}
++
++fn plain(pos: glam::Vec3, white: [f32; 2], color: u32) -> Vertex {
++    Vertex {
++        pos: pos.to_array(),
++        uv: white,
++        layer: 0,
++        color,
++        light: 0,
++        normal: [0; 4],
++        glint_uv: [0.0, 0.0],
++    }
++}
++
++/// A file a mod ships in `native-data/<id>/`, built into the game.
++#[macro_export]
++macro_rules! native_data {
++    ($id:literal, $file:literal $(,)?) => {
++        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../../native-data/", $id, "/", $file))
++    };
++}
++
++/// The old host calls, by their old names.
++impl Game<'_> {
++    /// The width of `text` in GUI pixels (`Font.width`).
++    pub(in crate::game) fn mh_text_width(&self, text: &str) -> f32 {
++        HudBatch::text_width(&self.gui.atlas, text)
++    }
++    /// Part `src` of GUI sprite `name` drawn into `dst`, untinted.
++    pub(in crate::game) fn mh_sprite(
++        &self,
++        batch: &mut HudBatch,
++        name: &str,
++        src: [f32; 4],
++        dst: [f32; 4],
++    ) -> bool {
++        self.native_sprite(batch, name, src, dst, None)
++    }
++    pub(in crate::game) fn native_on(&self, mod_id: &str) -> bool {
++        !self.settings.mods.disabled.contains(mod_id)
++    }
++    /// A mod's setting `key`, one file per key in its data folder.
++    pub(in crate::game) fn native_setting(&self, mod_id: &str, key: &str) -> Option<String> {
++        let path = self.native_data_dir(mod_id).join(key);
++        fs::read_to_string(path).ok().map(|v| v.trim().to_owned())
++    }
++    pub(in crate::game) fn native_set_setting(&self, mod_id: &str, key: &str, value: &str) {
++        let dir = self.native_data_dir(mod_id);
++        let _ = fs::create_dir_all(&dir).and_then(|()| fs::write(dir.join(key), value));
++    }
++    /// The key the player chose for mod `mod_id`'s key `name`, or its default.
++    pub(in crate::game) fn native_mod_key(&self, mod_id: &str, name: &str, default: &str) -> String {
++        self.settings.mods.binding(mod_id, name, (default, 0)).0
++    }
++    pub(in crate::game) fn native_mod_screen(&self) -> Option<&str> {
++        self.mod_screen()
++    }
++    pub(in crate::game) fn native_mod_screen_open(&mut self, mod_id: &str) -> bool {
++        self.mod_screen_open(mod_id)
++    }
++    pub(in crate::game) fn native_mod_screen_close(&mut self, mod_id: &str) {
++        self.mod_screen_close(mod_id)
++    }
++    pub(in crate::game) fn native_playing(&self) -> bool {
++        self.screen == Screen::Playing
++            && self.title.is_none()
++            && self.sign_edit.is_none()
++            && self.book.is_none()
++    }
++    pub(in crate::game) fn native_camera(&self) -> Option<NativeCamera> {
++        self.camera()
++    }
++    pub(in crate::game) fn native_clock(&self) -> Option<NativeClock> {
++        self.clock()
++    }
++    pub(in crate::game) fn native_instance_dir(&self) -> PathBuf {
++        self.instance_dir()
++    }
++    pub(in crate::game) fn native_mod_image(&mut self, width: u32, height: u32, rgba: &[u8]) -> bool {
++        self.mod_image(width, height, rgba)
++    }
++    /// A play packet to the server, as the game sends its own: refused outside play.
++    pub(in crate::game) fn native_send_packet(
++        &mut self,
++        packet: horizon_protocol::packets::play::Serverbound,
++    ) -> Result<(), String> {
++        let remote = self.remote.as_ref().ok_or("not connected")?;
++        if !remote.joined || remote.reconfiguring.is_some() {
++            return Err("not in play".into());
++        }
++        self.send_play(packet);
++        Ok(())
++    }
++    pub(in crate::game) fn native_entity(&self, id: u32) -> Option<EntityRef> {
++        self.entity(id)
++    }
++    pub(in crate::game) fn native_entity_position(&self, entity: EntityRef) -> Option<[f64; 3]> {
++        self.entity_position(entity)
++    }
++    pub(in crate::game) fn native_entity_uuid(&mut self, entity: EntityRef) -> Option<u128> {
++        self.entity_uuid(entity)
++    }
++    pub(in crate::game) fn native_has_shift_down(&self) -> bool {
++        self.has_shift_down()
++    }
++    pub(in crate::game) fn native_client_action_bar(&mut self, text: Text, animate: bool) {
++        if self.native_window() {
++            self.titles.set_overlay(text, animate);
++        }
++    }
++    pub(in crate::game) fn native_gui_draw_item(
++        &self,
++        batch: &mut HudBatch,
++        stack: &ItemStack,
++        at: [f32; 2],
++    ) {
++        self.draw_item(batch, stack, at[0], at[1]);
++    }
++    pub(in crate::game) fn native_push_voice(
++        &mut self,
++        mod_id: &str,
++        source: u128,
++        samples: &[f32],
++        sample_rate: u32,
++        at: Option<[f64; 3]>,
++    ) -> bool {
++        self.native_window()
++            && self
++                .audio
++                .push_voice(mod_id, source, samples, sample_rate, at)
++    }
++    pub(in crate::game) fn native_upgrade_block_state(
++        &self,
++        name: &str,
++        props: &[(String, String)],
++        data_version: i32,
++    ) -> (String, Vec<(String, String)>) {
++        horizon_world::datafix::native_upgrade_block_state(name, props, data_version)
++    }
++    pub(in crate::game) fn native_health_hud_state(&mut self) -> &mut horizon_client::hud_layout::HealthHud {
++        &mut self.health_hud
++    }
++    pub(in crate::game) fn native_client_state(&self) -> Option<NativeClientState> {
++        if !self.native_window() {
++            return None;
++        }
++        let (w, h) = self.gui_size();
++        let covered = self.title.is_some() || self.screen_over_playing() || self.remote_screen_up();
++        Some(NativeClientState {
++            focused: self.focused,
++            gui_hidden: self.ui.hide_gui,
++            gui_size: [w, h],
++            server_address: self.remote.as_ref().map(|r| r.session.address.clone()),
++            logged_in: self.remote.as_ref().is_some_and(|r| r.logged_in),
++            yaw: self.yaw,
++            pitch: self.pitch,
++            screen: match self.screen {
++                _ if covered => NativeScreenKind::Other,
++                Screen::Playing => NativeScreenKind::Playing,
++                Screen::Chat => NativeScreenKind::Chat,
++                Screen::Dead => NativeScreenKind::Death,
++                _ => NativeScreenKind::Other,
++            },
++            debug_screen: self.debug,
++            world: self.remote.as_ref().filter(|r| r.logged_in).map(|r| {
++                match self.integrated.as_ref() {
++                    Some(server) => NativeWorldId::Singleplayer(server.save_folder.clone()),
++                    None => NativeWorldId::Server(r.session.address.clone()),
++                }
++            }),
++        })
++    }
++    pub(in crate::game) fn native_client_entities(&self) -> Vec<NativeClientEntity> {
++        if !self.native_window() || self.remote.is_none() {
++            return Vec::new();
++        }
++        self.mobs
++            .iter()
++            .filter(|m| !m.removed)
++            .map(|m| {
++                let b = m.bounds();
++                let (lo, hi) = (b.min_position(), b.max_position());
++                NativeClientEntity {
++                    id: m.id,
++                    player_uuid: self.remote_player_uuid(m.id),
++                    player_name: self.remote_player_name(m.id).map(str::to_owned),
++                    position: [m.position.x, m.position.y, m.position.z],
++                    previous_position: [m.previous.x, m.previous.y, m.previous.z],
++                    bounds: [[lo.x, lo.y, lo.z], [hi.x, hi.y, hi.z]],
++                    height: m.height(),
++                    head_yaw: m.head_yaw,
++                    head_pitch: m.head_pitch,
++                    alive: m.alive(),
++                    invisible: m.invisible || m.has_effect("minecraft:invisibility"),
++                    kind: m.kind.id.to_string(),
++                    yaw: m.yaw,
++                    baby: m.is_baby(),
++                    spectator: m.extra.spectator,
++                    texture: Some(horizon_client::mobs::render::body(m).1)
++                        .filter(|t| !t.is_empty())
++                        .map(Cow::into_owned),
++                }
++            })
++            .collect()
++    }
++    pub(in crate::game) fn native_client_items(&self) -> Vec<NativeClientItem> {
++        if !self.native_window() || self.remote.is_none() {
++            return Vec::new();
++        }
++        self.dropped
++            .iter()
++            .filter(|e| e.stack.count > 0)
++            .map(|e| NativeClientItem {
++                id: e.id,
++                stack: e.stack.clone(),
++                position: [e.position.x, e.position.y, e.position.z],
++                previous_position: [e.previous.x, e.previous.y, e.previous.z],
++            })
++            .collect()
++    }
++}
+diff --git a/crates/horizon-client/src/game/native_hooks/mod.rs b/crates/horizon-client/src/game/native_hooks/mod.rs
+index 4926ea14e..4e9dc0ab0 100644
+--- a/crates/horizon-client/src/game/native_hooks/mod.rs
++++ b/crates/horizon-client/src/game/native_hooks/mod.rs
+@@ -124,6 +124,8 @@ pub(in crate::game) use add_attribute_tooltips::HookedAttributeTooltips;
+ pub(in crate::game) use bounce_restitution::install_block_contact_hooks;
+ pub(in crate::game) use fishing_medium::NativeFishingMedium;
+ pub(in crate::game) use living_change_target::NativeHookHost;
++#[allow(unused_imports)]
++pub(in crate::game) use minehouse_compat::*;
+ include!("shared.rs");
+ 
+ use mod_api::ModBlockEntity;
+diff --git a/crates/horizon-client/src/game/native_hooks/shared.rs b/crates/horizon-client/src/game/native_hooks/shared.rs
+index 899127e7e..9f3498ad0 100644
+--- a/crates/horizon-client/src/game/native_hooks/shared.rs
++++ b/crates/horizon-client/src/game/native_hooks/shared.rs
+@@ -1149,6 +1149,7 @@ impl Game<'_> {
+         &mut self,
+         packet: &horizon_protocol::packets::play::Clientbound,
+     ) {
++        self.native_client_play_packet(packet);
+         if !mod_api::__private::listened(mod_api::HookId::ClientPacket) {
+             return;
+         }
+@@ -3236,6 +3237,7 @@ impl Game<'_> {
+             row.native = Some(NativePage { mappings, settings });
+             self.settings.mods.installed.push(row);
+         }
++        self.mh_list_mods();
+     }
+     /// The settings mod `mod_id` registered, with their kept values, as its page shows them.
+     fn native_page_settings(&self, mod_id: &str) -> Vec<NativeSetting> {
+@@ -3277,6 +3279,9 @@ impl Game<'_> {
+     /// Setting `j` of native mod `i`'s page (its index in Options > Mods) changed on the page:
+     /// kept as the mod registered it, then the mod is told (`setting_changed`).
+     pub(super) fn native_setting_event(&mut self, i: usize, j: usize) {
++        if self.mh_setting_event(i, j) {
++            return;
++        }
+         let Some(row) = self.settings.mods.installed.get(i) else {
+             return;
+         };
+@@ -3300,6 +3305,9 @@ impl Game<'_> {
+     }
+     /// Native mod `i`'s page opened: its settings' kept values read again.
+     pub(super) fn native_settings_refresh(&mut self, i: usize) {
++        if self.mh_settings_refresh(i) {
++            return;
++        }
+         let Some(id) = self.settings.mods.installed.get(i).map(|m| m.id.clone()) else {
+             return;
+         };
+diff --git a/crates/horizon-client/src/game/network/remote/chat_received.rs b/crates/horizon-client/src/game/network/remote/chat_received.rs
+index 3e0a2857a..d9fd4630e 100644
+--- a/crates/horizon-client/src/game/network/remote/chat_received.rs
++++ b/crates/horizon-client/src/game/network/remote/chat_received.rs
+@@ -55,6 +55,7 @@ impl Game<'_> {
+         player: Option<&mod_api::PlayerChatInfo>,
+         line: &mut horizon_client::text::Text,
+     ) -> bool {
++        self.native_chat_received(overlay, sender, line);
+         if !mod_api::__private::listened(mod_api::HookId::ClientChatReceived) {
+             return true;
+         }
+diff --git a/crates/horizon-client/src/world_geometry.rs b/crates/horizon-client/src/world_geometry.rs
+index 58ccbb90c..932596e68 100644
+--- a/crates/horizon-client/src/world_geometry.rs
++++ b/crates/horizon-client/src/world_geometry.rs
+@@ -76,6 +76,11 @@ impl Default for WorldGeometry {
+ }
+ impl WorldGeometry {
+     /// Start a view even if nothing will be submitted; previous output disappears.
++    /// MineHouse: the depth-tested and through-walls quads and lines, and the view, for the
++    /// old primitives' tessellation.
++    pub fn raw(&mut self) -> (&mut [Vec<Vertex>; 2], &mut [Vec<[f32; 8]>; 2], Mat4) {
++        (&mut self.quads, &mut self.lines, self.view)
++    }
+     pub fn reset(&mut self, camera: [f64; 3], view: Mat4, white: [f32; 2]) {
+         self.camera = camera;
+         self.view = view;
+diff --git a/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs b/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs
+index 471f1dffd..0ad636407 100644
+--- a/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs
++++ b/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs
+@@ -236,6 +236,17 @@ fn main() {
+         Some("surface-diff") => surface_diff(&args[1..]),
+         _ => {}
+     }
++    // MineHouse: the game's generated module lists written out, as the launcher prepares
++    // horizon-mixins' input (`prepare_mixins_source`).
++    if let [command, root] = &args[..]
++        && command == "materialize"
++    {
++        if let Err(error) = horizon_mod_api_gen::materialize_game_modules(root) {
++            eprintln!("horizon-stage materialize: {error}");
++            std::process::exit(1);
++        }
++        return;
++    }
+     if let [command, root, out] = &args[..]
+         && command == "surface"
+     {
+diff --git a/crates/horizon-mod-vocab/src/client/extras_hud.rs b/crates/horizon-mod-vocab/src/client/extras_hud.rs
+index d1b30caea..e4e741db2 100644
+--- a/crates/horizon-mod-vocab/src/client/extras_hud.rs
++++ b/crates/horizon-mod-vocab/src/client/extras_hud.rs
+@@ -8,10 +8,10 @@ const MARGIN: f32 = 2.0;
+ #[derive(horizon_mod_api_macros::Wire)]
+ #[wire(internal_field_layouts)]
+ pub struct Corners {
+-    pub(crate) width: f32,
+-    pub(crate) height: f32,
++    pub width: f32,
++    pub height: f32,
+     /// Distance from the corner's top or bottom edge, per `Corner::ALL`.
+-    pub(crate) used: [f32; 4],
++    pub used: [f32; 4],
+ }
+ impl Corners {
+     /// `top_right` reserves the status effect icons' rows.

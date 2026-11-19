@@ -138,7 +138,7 @@ jobs:
           path: |
             ~/.cargo/registry
             ~/.cargo/git
-            ~/.cargo/bin/horizon-mixins*
+            mixins-bin
             stage-target
             prepare-target
           key: ${{ matrix.name }}-${{ steps.pins.outputs.horizon }}-${{ hashFiles('mods/**') }}
@@ -148,7 +148,19 @@ jobs:
       - name: horizon-mixins
         shell: bash
         run: |
-          command -v horizon-mixins || cargo install --locked --git https://github.com/horizon-rust/horizon-mixins --rev ${{ steps.pins.outputs.mixins }} horizon-mixins-cli
+          # The pinned tool with Horizon's own carried patch (tools/mixins/ in Horizon, copied) and
+          # ours (tools/horizon-mixins-*.patch), built once per pin and patch set.
+          set -euo pipefail
+          stamp="${{ steps.pins.outputs.mixins }}-${{ hashFiles('tools/horizon-mixins-*.patch') }}"
+          if [ "$(cat mixins-bin/stamp 2>/dev/null)" != "$stamp" ]; then
+            rm -rf mixins-src mixins-bin
+            git clone -q https://github.com/horizon-rust/horizon-mixins mixins-src
+            git -C mixins-src checkout -q ${{ steps.pins.outputs.mixins }}
+            for patch in tools/horizon-mixins-*.patch; do git -C mixins-src apply "$PWD/$patch"; done
+            cargo install --locked --path mixins-src/crates/horizon-mixins-cli --root mixins-bin
+            echo "$stamp" > mixins-bin/stamp
+          fi
+          echo "$PWD/mixins-bin/bin" >> "$GITHUB_PATH"
       - name: Horizon's files beside the game
         shell: bash
         run: |
@@ -167,6 +179,8 @@ jobs:
       - name: Apply the mods
         shell: bash
         run: python3 tools/stage.py horizon-src stage
+        env:
+          CARGO_TARGET_DIR: ${{ github.workspace }}/prepare-target
       - name: Compile
         shell: bash
         run: |
@@ -177,9 +191,11 @@ jobs:
           [ -f stage/.horizon-mod-api-injections.json ] && export HORIZON_MOD_API_INJECTIONS="$PWD/stage/.horizon-mod-api-injections.json"
           # The mods feature, while the revision still has it (the launcher's `has_mods_feature`).
           grep -q '^mods *=' stage/crates/horizon-client/Cargo.toml && args+=(--features horizon-client/mods)
-          cargo build "${args[@]}" --manifest-path stage/Cargo.toml --locked --profile release -p horizon-client --bin horizon-client
+          cargo build "${args[@]}" --manifest-path stage/Cargo.toml --locked --profile release -p horizon-game --bin horizon-client
         env:
           CARGO_TARGET_DIR: ${{ github.workspace }}/stage-target
+          # The stage has no .git: the build's identity is the pinned commit.
+          HORIZON_GAME_BUILD_ID: ${{ steps.pins.outputs.horizon }}
       - name: Package
         shell: bash
         run: |

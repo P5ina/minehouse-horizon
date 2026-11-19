@@ -36,13 +36,13 @@ fn minehouse_screen(
         game.native_text(batch, s, [x, y], rgb, false);
     };
     let centered = |batch: &mut horizon_client::hud::HudBatch, s: &str, cx: f32, y: f32, rgb: u32| {
-        let tw = game.native_text_width(s);
+        let tw = game.mh_text_width(s);
         game.native_text(batch, s, [(cx - tw / 2.0).round(), y], rgb, false);
     };
 
     game.native_fill(batch, [0.0, 0.0, size[0], size[1]], 0x6000_0000);
     let title = "Гардероб";
-    let title_w = game.native_text_width(title);
+    let title_w = game.mh_text_width(title);
     game.native_text(batch, title, [(size[0] - title_w) / 2.0, (lay.left.y - 12.0).max(2.0)], m::FG, true);
 
     // Left: tabs and tiles.
@@ -116,7 +116,7 @@ fn minehouse_screen(
         } else {
             format!("{} MX", item.price)
         };
-        let bw = game.native_text_width(&badge) + 10.0;
+        let bw = game.mh_text_width(&badge) + 10.0;
         let b = m::Rect { x: lay.right.x + lay.right.w - m::PAD - bw, y, w: bw, h: 12.0 };
         card(batch, b, 0, 0xFF00_0000 | if worn { m::ACCENT } else { 0x27272A });
         let color = if worn {
@@ -130,7 +130,7 @@ fn minehouse_screen(
     }
     y += 16.0;
     let lines = match item {
-        Some(item) => m::wrap(&item.name, m::RIGHT_W - m::PAD * 2.0, |s| game.native_text_width(s)),
+        Some(item) => m::wrap(&item.name, m::RIGHT_W - m::PAD * 2.0, |s| game.mh_text_width(s)),
         None => Vec::new(),
     };
     let right = m::right_layout(&lay, item, lines.len());
@@ -197,14 +197,14 @@ fn minehouse_screen(
     game.native_text(batch, &format!("{} MX", w.coins), [x, by + 2.0], m::FG, true);
     if w.store.starts_with("https://") {
         let top = "Пополнить";
-        let tw = game.native_text_width(top);
+        let tw = game.mh_text_width(top);
         let hover = right.top_up(&lay, tw).over(mouse);
         text(batch, top, lay.right.x + lay.right.w - m::PAD - tw, by + 2.0, if hover { m::FG } else { m::ACCENT });
     }
 
     // What the hints say along the bottom.
     let hints = "ЛКМ — выбрать   Колесо — листать   Esc — выйти";
-    let hw = game.native_text_width(hints);
+    let hw = game.mh_text_width(hints);
     let bar = m::Rect { x: ((size[0] - hw) / 2.0 - 8.0).floor(), y: lay.left.y + lay.left.h + 4.0, w: hw + 16.0, h: 14.0 };
     if bar.y + bar.h <= size[1] {
         card(batch, bar, m::CARD, m::BORDER);
@@ -218,7 +218,7 @@ fn minehouse_screen(
 
     // A small tooltip by the pointer.
     fn hint_line(game: &crate::game::Game<'_>, batch: &mut horizon_client::hud::HudBatch, s: &str, at: [f32; 2]) {
-        let tw = game.native_text_width(s);
+        let tw = game.mh_text_width(s);
         let (x, y) = (at[0] + 8.0, at[1] - 14.0);
         game.native_fill(batch, [x - 3.0, y - 3.0, tw + 6.0, 14.0], 0xF010_0010);
         game.native_text(batch, s, [x, y], 0xFFFFFF, false);

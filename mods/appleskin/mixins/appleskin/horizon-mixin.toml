@@ -4,7 +4,7 @@ version = "3.0.10"
 priority = 100
 
 [compatibility]
-horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
 
 [[module]]
 id = "runtime"
@@ -15,17 +15,17 @@ source = "runtime.rs"
 [[injection]]
 id = "packet"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_client_packet"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_client_play_packet"
 helper = "packet.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
-  { name = "packet", ty = "&horizon_client::mod_api::ClientboundPlayPacket", value = "packet" },
+  { name = "packet", ty = "&horizon_protocol::packets::play::Clientbound", value = "packet" },
 ]
 
 [[injection]]
 id = "tick"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_client_tick_post"
+target = "horizon_client::game::native_hooks::client_tick_post::Game<'_>::native_client_tick_post"
 helper = "tick.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -34,7 +34,7 @@ bindings = [
 [[injection]]
 id = "hud"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_health_hud"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_health_hud"
 helper = "hud.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -47,7 +47,7 @@ bindings = [
 [[injection]]
 id = "tooltip-size"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_tooltip_component"
 helper = "tooltip_size.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
@@ -58,19 +58,19 @@ bindings = [
 [[injection]]
 id = "tooltip-draw"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_tooltip_component_draw"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_tooltip_component_draw"
 helper = "tooltip_draw.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
   { name = "stack", ty = "&horizon_client::items::ItemStack", value = "stack" },
-  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *draw" },
   { name = "origin", ty = "[f32; 2]", value = "origin" },
 ]
 
 [[injection]]
 id = "list"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_mods"
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },

@@ -6,7 +6,7 @@ priority = 100
 # Pinned: it reads the loaded chunks and puts its picture into the mod image
 # slot itself (below Plasmo Voice's icons), neither of which is a stable hook.
 [compatibility]
-horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
 
 [[module]]
 id = "runtime"
@@ -17,7 +17,7 @@ source = "runtime.rs"
 [[injection]]
 id = "frame"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_frame"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_frame"
 helper = "frame.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -26,7 +26,7 @@ bindings = [
 [[injection]]
 id = "key"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_key"
 helper = "key.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -37,18 +37,18 @@ bindings = [
 [[injection]]
 id = "render"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_render_post"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_render_post"
 helper = "render.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
-  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *batch" },
-  { name = "screen", ty = "&horizon_client::mod_api::NativeScreenView<'_>", value = "screen" },
+  { name = "batch", ty = "&mut horizon_client::hud::HudBatch", value = "&mut *draw" },
+  { name = "screen", ty = "&crate::game::native_hooks::NativeScreenView<'_>", value = "screen" },
 ]
 
 [[injection]]
 id = "keys"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_key_pressed_pre"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_key_pressed_pre"
 helper = "keys.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
@@ -59,7 +59,7 @@ bindings = [
 [[injection]]
 id = "drag"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_dragged_pre"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_mouse_dragged_pre"
 helper = "drag.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
@@ -71,11 +71,11 @@ bindings = [
 [[injection]]
 id = "scroll"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_screen_mouse_scrolled_pre"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_screen_mouse_scrolled_pre"
 helper = "scroll.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
-  { name = "screen", ty = "&horizon_client::mod_api::NativeScreenView<'_>", value = "screen" },
+  { name = "screen", ty = "&crate::game::native_hooks::NativeScreenView<'_>", value = "screen" },
   { name = "scroll", ty = "[f64; 2]", value = "scroll" },
   { name = "canceled", ty = "&mut bool", value = "&mut *canceled" },
 ]
@@ -83,7 +83,7 @@ bindings = [
 [[injection]]
 id = "list"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_mods"
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },

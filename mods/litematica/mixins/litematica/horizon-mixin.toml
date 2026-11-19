@@ -6,7 +6,7 @@ priority = 100
 # Pinned: the printer sends its clicks inside the game's multiplayer code
 # (`game::remote`'s sequence and carried slot), not a stable hook point.
 [compatibility]
-horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
 
 # .litematic files, placements, the commands and the printer's choices.
 [[crate]]
@@ -29,7 +29,7 @@ bindings = [
 [[injection]]
 id = "packet"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_client_packet"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_client_play_packet"
 helper = "packet.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -39,17 +39,17 @@ bindings = [
 [[injection]]
 id = "submit"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_world_submit"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_world_submit"
 helper = "submit.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
-  { name = "draw", ty = "&mut crate::game::native_world_draw::NativeWorldDraw", value = "&mut *draw" },
+  { name = "draw", ty = "&mut crate::game::native_hooks::NativeWorldDraw", value = "&mut *draw" },
 ]
 
 [[injection]]
 id = "prims"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_world_primitives"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_world_primitives"
 helper = "prims.rs"
 bindings = [
   { name = "game", ty = "&crate::game::Game<'_>", value = "&*self" },
@@ -60,7 +60,7 @@ bindings = [
 [[injection]]
 id = "command"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_command"
+target = "horizon_client::game::native_hooks::base::Game<'_>::native_command"
 helper = "command.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -71,7 +71,7 @@ bindings = [
 [[injection]]
 id = "commands"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_commands"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_commands"
 helper = "commands.rs"
 bindings = [
   { name = "commands", ty = "&mut Vec<&'static str>", value = "&mut *commands" },
@@ -80,7 +80,7 @@ bindings = [
 [[injection]]
 id = "key"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_key"
 helper = "key.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -91,7 +91,7 @@ bindings = [
 [[injection]]
 id = "list"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_mods"
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },

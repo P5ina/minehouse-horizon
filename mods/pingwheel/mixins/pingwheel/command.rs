@@ -1,7 +1,7 @@
 // `/pingwheel` (`ClientCommandBuilder`): help, config and channel.
 fn pingwheel_command(game: &mut crate::game::Game<'_>, command: &str, ran: &mut bool) {
     use crate::game::pingwheel as m;
-    use horizon_client::mod_api::ServerboundPlayPacket as S;
+    use horizon_protocol::packets::play::Serverbound as S;
     use horizon_protocol::packets::configuration::CustomPayload;
     if *ran || !game.native_on(m::ID) {
         return;

@@ -4,7 +4,7 @@ version = "26.3.5"
 priority = 100
 
 [compatibility]
-horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
 
 # Key Binds' search box matches a binding's key and category too, not only its
 # name: once the game has filtered and sorted the list (at `list_start`), the
@@ -12,14 +12,14 @@ horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
 [[injection]]
 id = "search"
 kind = "MODIFY_VARIABLE"
-target = "horizon_client_render::options_ui::OptionsUi::layout"
+target = "horizon_client_render::options_ui::layout::OptionsUi::layout"
 variable = { name = "list_start", ordinal = 0, at = "STORE" }
 require = 1
 ordinal = 0
 helper = "search.rs"
 bindings = [
   { name = "value", ty = "usize", value = "$value" },
-  { name = "mappings", ty = "&mut Vec<(&str, &str)>", value = "$local_mut:mappings:0" },
+  { name = "mappings", ty = "&mut Vec<(&'static str, &'static str)>", value = "$local_mut:mappings:0" },
   { name = "query", ty = "&String", value = "$local_ref:query:0" },
   { name = "s", ty = "&crate::settings::Settings", value = "s" },
 ]
@@ -33,29 +33,9 @@ source = "runtime.rs"
 [[injection]]
 id = "list"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_mods"
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
 ]
 
-# The native mods' keys at the top of Key Binds' list: the list's first row
-# starts lower by their rows' height.
-[[injection]]
-id = "mod-keys"
-kind = "MODIFY_VARIABLE"
-target = "horizon_client_render::options_ui::OptionsUi::layout"
-variable = { name = "y", ordinal = 3, at = "STORE" }
-require = 3
-ordinal = 0
-helper = "mod_keys.rs"
-bindings = [
-  { name = "value", ty = "f32", value = "$value" },
-  { name = "out", ty = "&mut Vec<Widget>", value = "$local_mut:out:0" },
-  { name = "rows", ty = "&mut ListRows", value = "$local_mut:rows:0" },
-  { name = "ui", ty = "&OptionsUi", value = "&*self" },
-  { name = "s", ty = "&crate::settings::Settings", value = "s" },
-  { name = "query", ty = "&String", value = "$local_ref:query:0" },
-  { name = "w", ty = "f32", value = "w" },
-  { name = "cx", ty = "f32", value = "$local:cx:0" },
-]

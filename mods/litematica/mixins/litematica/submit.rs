@@ -1,7 +1,7 @@
 // The schematics' missing blocks, drawn where they go (as Litematica draws
 // its schematic world): nearest sections first, within a few sections of
 // the camera, at most a few thousand a frame.
-fn litematica_submit(game: &crate::game::Game<'_>, draw: &mut crate::game::native_world_draw::NativeWorldDraw) {
+fn litematica_submit(game: &crate::game::Game<'_>, draw: &mut crate::game::native_hooks::NativeWorldDraw) {
     use litematica_engine as lm;
     if !game.native_on(lm::ID) {
         return;
@@ -44,7 +44,7 @@ fn litematica_submit(game: &crate::game::Game<'_>, draw: &mut crate::game::nativ
                     let props: Vec<(&str, &str)> = state.props.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect();
                     draw.push();
                     if draw.translate_world([f64::from(pos[0]), f64::from(pos[1]), f64::from(pos[2])]) {
-                        game.native_draw_block(draw, &state.name, &props);
+                        game.native_world_draw_block(draw, &state.name, &props);
                     }
                     draw.pop();
                     drawn += 1;

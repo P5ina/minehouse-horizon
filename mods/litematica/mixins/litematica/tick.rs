@@ -8,8 +8,8 @@ fn litematica_tick(game: &mut crate::game::Game<'_>) {
     }
     // The world: its placements come back when it is joined again.
     let world = game.native_client_state().and_then(|s| s.world).map(|w| match w {
-        crate::game::native_client_services::NativeWorldId::Singleplayer(s) => format!("local_{s}"),
-        crate::game::native_client_services::NativeWorldId::Server(s) => format!("server_{s}"),
+        crate::game::native_hooks::NativeWorldId::Singleplayer(s) => format!("local_{s}"),
+        crate::game::native_hooks::NativeWorldId::Server(s) => format!("server_{s}"),
     });
     let dir = game.native_instance_dir().join("schematics");
     let changed = lm::with(|m| m.world != world);

@@ -4,7 +4,7 @@ version = "1.0.0"
 priority = 100
 
 [compatibility]
-horizon_revision = "9f42064c11efe7ef3e5ed2baad7ddc2a3b36eea0"
+horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
 
 [[module]]
 id = "runtime"
@@ -15,7 +15,7 @@ source = "runtime.rs"
 [[injection]]
 id = "tick"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_client_tick_post"
+target = "horizon_client::game::native_hooks::client_tick_post::Game<'_>::native_client_tick_post"
 helper = "tick.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -24,7 +24,7 @@ bindings = [
 [[injection]]
 id = "key"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_key"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_key"
 helper = "key.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -35,7 +35,7 @@ bindings = [
 [[injection]]
 id = "list"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_mods"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_mods"
 helper = "list.rs"
 bindings = [
   { name = "mods", ty = "&mut Vec<crate::game::native_hooks::NativeMod>", value = "&mut *mods" },
@@ -44,7 +44,7 @@ bindings = [
 [[injection]]
 id = "settings"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_settings"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_settings"
 helper = "settings.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },
@@ -55,7 +55,7 @@ bindings = [
 [[injection]]
 id = "click"
 kind = "HEAD"
-target = "horizon_client::game::native_hooks::Game<'_>::native_settings_click"
+target = "horizon_client::game::native_hooks::minehouse_compat::Game<'_>::native_settings_click"
 helper = "click.rs"
 bindings = [
   { name = "game", ty = "&mut crate::game::Game<'_>", value = "&mut *self" },

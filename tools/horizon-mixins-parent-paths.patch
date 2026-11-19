@@ -1,0 +1,26 @@
+diff --git a/crates/horizon-mixins-core/src/index.rs b/crates/horizon-mixins-core/src/index.rs
+index 740c0dc..8398fa9 100644
+--- a/crates/horizon-mixins-core/src/index.rs
++++ b/crates/horizon-mixins-core/src/index.rs
+@@ -401,7 +401,20 @@ impl Index {
+                                 )
+                                 .file(file));
+                             };
+-                            source::relative(Path::new(&value.value()))?;
++                            // `..` may climb out of the module's folder; the module is still
++                            // refused below when it leaves the workspace.
++                            let raw = Path::new(&value.value()).to_path_buf();
++                            if raw.as_os_str().is_empty()
++                                || raw.components().any(|c| {
++                                    !matches!(
++                                        c,
++                                        std::path::Component::Normal(_)
++                                            | std::path::Component::ParentDir
++                                    )
++                                })
++                            {
++                                source::relative(&raw)?;
++                            }
+                             // #[path] on an external item is relative to the containing source directory.
+                             let base = if parent.is_empty() {
+                                 root.join(file).parent().unwrap().to_path_buf()

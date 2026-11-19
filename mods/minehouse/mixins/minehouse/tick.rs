@@ -4,7 +4,7 @@
 // so when the server has no wardrobe.
 fn minehouse_tick(game: &mut crate::game::Game<'_>) {
     use crate::game::minehouse as m;
-    use horizon_client::mod_api::ServerboundPlayPacket as S;
+    use horizon_protocol::packets::play::Serverbound as S;
     use horizon_protocol::packets::configuration::CustomPayload;
     // MineHouse players get Horizon's Mouse Tweaks controls on: once, so a
     // player who switches them off in Extras keeps them off.
@@ -44,7 +44,7 @@ fn minehouse_tick(game: &mut crate::game::Game<'_>) {
     let silent = m::with(|s| s.asked.is_some_and(|at| at.elapsed() >= m::NO_WARDROBE_AFTER));
     if silent {
         m::with(|s| s.asked = None);
-        let line = horizon_client::mod_api::Text::literal("На этом сервере нет гардероба");
+        let line = horizon_client::text::Text::literal("На этом сервере нет гардероба");
         game.native_client_action_bar(line, false);
     }
 }

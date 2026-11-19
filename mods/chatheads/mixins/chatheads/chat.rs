@@ -22,10 +22,11 @@ fn chatheads_chat(
     let Some((name, uuid)) = owner.and_then(|o| players.into_iter().find(|p| p.1 == o)) else {
         return;
     };
-    let Ok(profile) = serde_json::from_str(&m::profile_json(uuid, &name)) else {
+    let Ok(profile) = serde_json::from_str::<serde_json::Value>(&m::profile_json(uuid, &name)).map(std::sync::Arc::new) else {
         return;
     };
-    let mut head = Text::literal("\u{FFFC}");
-    head.spans[0].style.inline_object = Some(InlineObject::Player { profile, hat: true, fallback: String::new() });
+    let mut spans = Text::literal("\u{FFFC}").into_spans();
+    spans[0].style.inline_object = Some(InlineObject::Player { profile, hat: true, fallback: String::new() });
+    let head = Text::from_spans(spans);
     *message = head.append(" ").append(std::mem::take(message));
 }
