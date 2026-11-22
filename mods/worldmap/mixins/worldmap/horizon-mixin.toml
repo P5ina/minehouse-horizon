@@ -6,7 +6,7 @@ priority = 100
 # Pinned: it reads the loaded chunks and puts its picture into the mod image
 # slot itself (below Plasmo Voice's icons), neither of which is a stable hook.
 [compatibility]
-horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
+horizon_revision = "f037744a79f9982c47876f49c5a3067279f88706"
 
 [[module]]
 id = "runtime"

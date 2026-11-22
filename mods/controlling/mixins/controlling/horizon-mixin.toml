@@ -4,7 +4,7 @@ version = "26.3.5"
 priority = 100
 
 [compatibility]
-horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
+horizon_revision = "f037744a79f9982c47876f49c5a3067279f88706"
 
 # Key Binds' search box matches a binding's key and category too, not only its
 # name: once the game has filtered and sorted the list (at `list_start`), the

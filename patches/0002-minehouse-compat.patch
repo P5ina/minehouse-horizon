@@ -1,5 +1,5 @@
 diff --git a/crates/horizon-client-render/src/options_ui/layout.rs b/crates/horizon-client-render/src/options_ui/layout.rs
-index 5c8a64125..fea558582 100644
+index 5c8a641256..fea5585820 100644
 --- a/crates/horizon-client-render/src/options_ui/layout.rs
 +++ b/crates/horizon-client-render/src/options_ui/layout.rs
 @@ -91,7 +91,7 @@ impl OptionsUi {
@@ -36,10 +36,10 @@ index 5c8a64125..fea558582 100644
                      } else {
                          12.0
 diff --git a/crates/horizon-client/src/game.rs b/crates/horizon-client/src/game.rs
-index 57c062262..cd1a9a3f6 100644
+index d546f2e55c..01bbbb0262 100644
 --- a/crates/horizon-client/src/game.rs
 +++ b/crates/horizon-client/src/game.rs
-@@ -643,7 +643,13 @@ struct FallingBlock {
+@@ -647,7 +647,13 @@ struct FallingBlock {
      /// The UUID and compound it was loaded with, kept while it moves.
      saved: Option<Box<([i32; 4], horizon_core::nbt::Tag)>>,
  }
@@ -55,7 +55,7 @@ index 57c062262..cd1a9a3f6 100644
  impl FallingBlock {
      /// Where `FallingBlockRenderer` draws the block's model corner, `alpha`
 diff --git a/crates/horizon-client/src/game/blocks/stations/draw.rs b/crates/horizon-client/src/game/blocks/stations/draw.rs
-index 4432de68f..ab113ab17 100644
+index 4432de68fb..ab113ab174 100644
 --- a/crates/horizon-client/src/game/blocks/stations/draw.rs
 +++ b/crates/horizon-client/src/game/blocks/stations/draw.rs
 @@ -133,7 +133,7 @@ impl Game<'_> {
@@ -149,7 +149,7 @@ index 4432de68f..ab113ab17 100644
                                  oy + y - 1.0,
                                  16.0,
 diff --git a/crates/horizon-client/src/game/interface/extras.rs b/crates/horizon-client/src/game/interface/extras.rs
-index 12c09ac36..288c96e5f 100644
+index 12c09ac369..288c96e5ff 100644
 --- a/crates/horizon-client/src/game/interface/extras.rs
 +++ b/crates/horizon-client/src/game/interface/extras.rs
 @@ -43,6 +43,7 @@ impl Game<'_> {
@@ -177,7 +177,7 @@ index 12c09ac36..288c96e5f 100644
      }
      /// The height the status effect icons take at the top right
 diff --git a/crates/horizon-client/src/game/modding/native_custom_geometry.rs b/crates/horizon-client/src/game/modding/native_custom_geometry.rs
-index 90350149d..b12a6b736 100644
+index 90350149da..b12a6b7360 100644
 --- a/crates/horizon-client/src/game/modding/native_custom_geometry.rs
 +++ b/crates/horizon-client/src/game/modding/native_custom_geometry.rs
 @@ -74,6 +74,7 @@ impl Game<'_> {
@@ -189,7 +189,7 @@ index 90350149d..b12a6b736 100644
          // Seconds of game time, wrapping every hour (72,000 ticks) so f32 keeps sub-tick steps.
          draw.set_time(((self.world.game_time.rem_euclid(72_000) as f64 + alpha) / 20.0) as f32);
 diff --git a/crates/horizon-client/src/game/modding/native_key_mappings.rs b/crates/horizon-client/src/game/modding/native_key_mappings.rs
-index e0bf5fcf5..bbbbec705 100644
+index e0bf5fcf5f..bbbbec7054 100644
 --- a/crates/horizon-client/src/game/modding/native_key_mappings.rs
 +++ b/crates/horizon-client/src/game/modding/native_key_mappings.rs
 @@ -57,6 +57,7 @@ impl Game<'_> {
@@ -201,10 +201,10 @@ index e0bf5fcf5..bbbbec705 100644
          self.native_input_key(key, layout_key, raw_code, action, modifiers);
      }
 diff --git a/crates/horizon-client/src/game/native_hooks/base.rs b/crates/horizon-client/src/game/native_hooks/base.rs
-index ec60171c5..3096c526d 100644
+index b6f423104f..a741760ec9 100644
 --- a/crates/horizon-client/src/game/native_hooks/base.rs
 +++ b/crates/horizon-client/src/game/native_hooks/base.rs
-@@ -824,6 +824,7 @@ impl Game<'_> {
+@@ -839,6 +839,7 @@ impl Game<'_> {
          canceled: &mut bool,
      ) {
          self.fire_mouse_scrolling(scroll, accumulated, buttons, cursor, modifiers, canceled);
@@ -212,7 +212,7 @@ index ec60171c5..3096c526d 100644
      }
      /// A command typed or clicked in chat, without its slash, before the
      /// server and Horizon's commands see it: set `ran` when the mod ran it.
-@@ -841,6 +842,7 @@ impl Game<'_> {
+@@ -856,6 +857,7 @@ impl Game<'_> {
          commands: &mut Vec<mod_api::Command>,
      ) {
          self.fire_register_client_commands(commands);
@@ -222,7 +222,7 @@ index ec60171c5..3096c526d 100644
      /// Called for world rendering and near-plane overlays; hand/HUD FOV uses its own path.
 diff --git a/crates/horizon-client/src/game/native_hooks/minehouse_compat.rs b/crates/horizon-client/src/game/native_hooks/minehouse_compat.rs
 new file mode 100644
-index 000000000..5c106c026
+index 0000000000..5c106c0263
 --- /dev/null
 +++ b/crates/horizon-client/src/game/native_hooks/minehouse_compat.rs
 @@ -0,0 +1,732 @@
@@ -959,7 +959,7 @@ index 000000000..5c106c026
 +    }
 +}
 diff --git a/crates/horizon-client/src/game/native_hooks/mod.rs b/crates/horizon-client/src/game/native_hooks/mod.rs
-index 4926ea14e..4e9dc0ab0 100644
+index 4926ea14e3..4e9dc0ab06 100644
 --- a/crates/horizon-client/src/game/native_hooks/mod.rs
 +++ b/crates/horizon-client/src/game/native_hooks/mod.rs
 @@ -124,6 +124,8 @@ pub(in crate::game) use add_attribute_tooltips::HookedAttributeTooltips;
@@ -972,10 +972,10 @@ index 4926ea14e..4e9dc0ab0 100644
  
  use mod_api::ModBlockEntity;
 diff --git a/crates/horizon-client/src/game/native_hooks/shared.rs b/crates/horizon-client/src/game/native_hooks/shared.rs
-index 899127e7e..9f3498ad0 100644
+index 8323b346fe..3f17b303dc 100644
 --- a/crates/horizon-client/src/game/native_hooks/shared.rs
 +++ b/crates/horizon-client/src/game/native_hooks/shared.rs
-@@ -1149,6 +1149,7 @@ impl Game<'_> {
+@@ -1159,6 +1159,7 @@ impl Game<'_> {
          &mut self,
          packet: &horizon_protocol::packets::play::Clientbound,
      ) {
@@ -983,7 +983,7 @@ index 899127e7e..9f3498ad0 100644
          if !mod_api::__private::listened(mod_api::HookId::ClientPacket) {
              return;
          }
-@@ -3236,6 +3237,7 @@ impl Game<'_> {
+@@ -3282,6 +3283,7 @@ impl Game<'_> {
              row.native = Some(NativePage { mappings, settings });
              self.settings.mods.installed.push(row);
          }
@@ -991,7 +991,7 @@ index 899127e7e..9f3498ad0 100644
      }
      /// The settings mod `mod_id` registered, with their kept values, as its page shows them.
      fn native_page_settings(&self, mod_id: &str) -> Vec<NativeSetting> {
-@@ -3277,6 +3279,9 @@ impl Game<'_> {
+@@ -3323,6 +3325,9 @@ impl Game<'_> {
      /// Setting `j` of native mod `i`'s page (its index in Options > Mods) changed on the page:
      /// kept as the mod registered it, then the mod is told (`setting_changed`).
      pub(super) fn native_setting_event(&mut self, i: usize, j: usize) {
@@ -1001,7 +1001,7 @@ index 899127e7e..9f3498ad0 100644
          let Some(row) = self.settings.mods.installed.get(i) else {
              return;
          };
-@@ -3300,6 +3305,9 @@ impl Game<'_> {
+@@ -3346,6 +3351,9 @@ impl Game<'_> {
      }
      /// Native mod `i`'s page opened: its settings' kept values read again.
      pub(super) fn native_settings_refresh(&mut self, i: usize) {
@@ -1012,7 +1012,7 @@ index 899127e7e..9f3498ad0 100644
              return;
          };
 diff --git a/crates/horizon-client/src/game/network/remote/chat_received.rs b/crates/horizon-client/src/game/network/remote/chat_received.rs
-index 3e0a2857a..d9fd4630e 100644
+index 3e0a2857a4..d9fd4630e3 100644
 --- a/crates/horizon-client/src/game/network/remote/chat_received.rs
 +++ b/crates/horizon-client/src/game/network/remote/chat_received.rs
 @@ -55,6 +55,7 @@ impl Game<'_> {
@@ -1024,7 +1024,7 @@ index 3e0a2857a..d9fd4630e 100644
              return true;
          }
 diff --git a/crates/horizon-client/src/world_geometry.rs b/crates/horizon-client/src/world_geometry.rs
-index 58ccbb90c..932596e68 100644
+index 58ccbb90ce..932596e681 100644
 --- a/crates/horizon-client/src/world_geometry.rs
 +++ b/crates/horizon-client/src/world_geometry.rs
 @@ -76,6 +76,11 @@ impl Default for WorldGeometry {
@@ -1040,10 +1040,10 @@ index 58ccbb90c..932596e68 100644
          self.camera = camera;
          self.view = view;
 diff --git a/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs b/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs
-index 471f1dffd..0ad636407 100644
+index 1b9a31b2fe..b5e39d6978 100644
 --- a/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs
 +++ b/crates/horizon-mod-api-gen/src/bin/horizon-stage.rs
-@@ -236,6 +236,17 @@ fn main() {
+@@ -293,6 +293,17 @@ fn main() {
          Some("surface-diff") => surface_diff(&args[1..]),
          _ => {}
      }
@@ -1058,11 +1058,11 @@ index 471f1dffd..0ad636407 100644
 +        }
 +        return;
 +    }
-     if let [command, root, out] = &args[..]
-         && command == "surface"
-     {
+     match &args[..] {
+         [command, root, out] if command == "surface" => return surface(root, out, None),
+         [command, root, out, flag, calls] if command == "surface" && flag == "--calls" => {
 diff --git a/crates/horizon-mod-vocab/src/client/extras_hud.rs b/crates/horizon-mod-vocab/src/client/extras_hud.rs
-index d1b30caea..e4e741db2 100644
+index d1b30caeaf..e4e741db20 100644
 --- a/crates/horizon-mod-vocab/src/client/extras_hud.rs
 +++ b/crates/horizon-mod-vocab/src/client/extras_hud.rs
 @@ -8,10 +8,10 @@ const MARGIN: f32 = 2.0;
