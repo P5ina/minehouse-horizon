@@ -171,6 +171,14 @@ jobs:
             | tar x -C horizon-dist/horizon-${{ matrix.name }}
           mv horizon-dist/horizon-${{ matrix.name }}/packaging/PLAY.txt horizon-dist/horizon-${{ matrix.name }}/PLAY.txt
           rmdir horizon-dist/horizon-${{ matrix.name }}/packaging
+          # Mojang republishes 26.3.json now and then; the pinned commit's lock doesn't know the
+          # newer copies yet (tools/lock-accept.json lists them, from Horizon's later lock).
+          lock=horizon-dist/horizon-${{ matrix.name }}/research-lock.json
+          jq --slurpfile extra tools/lock-accept.json '
+            .minecraft.accepted_manifest_sha1 = ((.minecraft.accepted_manifest_sha1 // []) + $extra[0].accepted_manifest_sha1 | unique)
+            | .minecraft.accepted_asset_index_sha1 = ((.minecraft.accepted_asset_index_sha1 // []) + $extra[0].accepted_asset_index_sha1 | unique)
+          ' "$lock" > "$lock.new"
+          mv "$lock.new" "$lock"
       - name: horizon-prepare
         shell: bash
         run: cargo build --manifest-path horizon-src/Cargo.toml --locked --profile release -p horizon-prepare --bin horizon-prepare
