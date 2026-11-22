@@ -27,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        id: rust
       - name: Linux audio headers (cpal)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config
       - name: Mods' own tests
@@ -61,6 +62,7 @@ jobs:
           path: horizon-src
           lfs: false
       - uses: dtolnay/rust-toolchain@stable
+        id: rust
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -71,8 +73,8 @@ jobs:
             ~/.cargo/registry
             minecraft
             horizon-src/target
-          key: exporters-${{ steps.pins.outputs.horizon }}
-          restore-keys: exporters-
+          key: exporters-${{ steps.rust.outputs.cachekey }}-${{ steps.pins.outputs.horizon }}
+          restore-keys: exporters-${{ steps.rust.outputs.cachekey }}-
       - name: Minecraft from Mojang
         run: python3 tools/fetch_minecraft.py horizon-src/research-lock.json minecraft
       - name: Compile the exporters
@@ -130,6 +132,7 @@ jobs:
           path: horizon-src
           lfs: false
       - uses: dtolnay/rust-toolchain@stable
+        id: rust
       - name: Linux build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev pkg-config
@@ -141,10 +144,12 @@ jobs:
             mixins-bin
             stage-target
             prepare-target
-          key: ${{ matrix.name }}-${{ steps.pins.outputs.horizon }}-${{ hashFiles('mods/**') }}
+          # The compiler in the key: a new stable reading crates the old one built crashed rustc
+          # ("invalid enum variant tag while decoding").
+          key: ${{ matrix.name }}-${{ steps.rust.outputs.cachekey }}-${{ steps.pins.outputs.horizon }}-${{ hashFiles('mods/**') }}
           restore-keys: |
-            ${{ matrix.name }}-${{ steps.pins.outputs.horizon }}-
-            ${{ matrix.name }}-
+            ${{ matrix.name }}-${{ steps.rust.outputs.cachekey }}-${{ steps.pins.outputs.horizon }}-
+            ${{ matrix.name }}-${{ steps.rust.outputs.cachekey }}-
       - name: horizon-mixins
         shell: bash
         run: |
