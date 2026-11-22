@@ -27,6 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        id: rust
       - name: Linux audio headers (cpal)
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev pkg-config
       - name: Mods' own tests
@@ -61,6 +62,7 @@ jobs:
           path: horizon-src
           lfs: false
       - uses: dtolnay/rust-toolchain@stable
+        id: rust
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -71,8 +73,8 @@ jobs:
             ~/.cargo/registry
             minecraft
             horizon-src/target
-          key: exporters-${{ steps.pins.outputs.horizon }}
-          restore-keys: exporters-
+          key: exporters-${{ steps.rust.outputs.cachekey }}-${{ steps.pins.outputs.horizon }}
+          restore-keys: exporters-${{ steps.rust.outputs.cachekey }}-
       - name: Minecraft from Mojang
         run: python3 tools/fetch_minecraft.py horizon-src/research-lock.json minecraft
       - name: Compile the exporters
@@ -130,6 +132,7 @@ jobs:
           path: horizon-src
           lfs: false
       - uses: dtolnay/rust-toolchain@stable
+        id: rust
       - name: Linux build dependencies
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends libasound2-dev libudev-dev pkg-config
@@ -141,10 +144,12 @@ jobs:
             mixins-bin
             stage-target
             prepare-target
-          key: ${{ matrix.name }}-${{ steps.pins.outputs.horizon }}-${{ hashFiles('mods/**') }}
+          # The compiler in the key: a new stable reading crates the old one built crashed rustc
+          # ("invalid enum variant tag while decoding").
+          key: ${{ matrix.name }}-${{ steps.rust.outputs.cachekey }}-${{ steps.pins.outputs.horizon }}-${{ hashFiles('mods/**') }}
           restore-keys: |
-            ${{ matrix.name }}-${{ steps.pins.outputs.horizon }}-
-            ${{ matrix.name }}-
+            ${{ matrix.name }}-${{ steps.rust.outputs.cachekey }}-${{ steps.pins.outputs.horizon }}-
+            ${{ matrix.name }}-${{ steps.rust.outputs.cachekey }}-
       - name: horizon-mixins
         shell: bash
         run: |
@@ -171,6 +176,14 @@ jobs:
             | tar x -C horizon-dist/horizon-${{ matrix.name }}
           mv horizon-dist/horizon-${{ matrix.name }}/packaging/PLAY.txt horizon-dist/horizon-${{ matrix.name }}/PLAY.txt
           rmdir horizon-dist/horizon-${{ matrix.name }}/packaging
+          # Mojang republishes 26.3.json now and then; the pinned commit's lock doesn't know the
+          # newer copies yet (tools/lock-accept.json lists them, from Horizon's later lock).
+          lock=horizon-dist/horizon-${{ matrix.name }}/research-lock.json
+          jq --slurpfile extra tools/lock-accept.json '
+            .minecraft.accepted_manifest_sha1 = ((.minecraft.accepted_manifest_sha1 // []) + $extra[0].accepted_manifest_sha1 | unique)
+            | .minecraft.accepted_asset_index_sha1 = ((.minecraft.accepted_asset_index_sha1 // []) + $extra[0].accepted_asset_index_sha1 | unique)
+          ' "$lock" > "$lock.new"
+          mv "$lock.new" "$lock"
       - name: horizon-prepare
         shell: bash
         run: cargo build --manifest-path horizon-src/Cargo.toml --locked --profile release -p horizon-prepare --bin horizon-prepare

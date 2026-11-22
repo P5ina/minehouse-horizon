@@ -1,6 +1,6 @@
 {
-  "horizon_revision": "f00125f61f794aaa3d4e950d301f353b35b6ee3d",
-  "horizon_nightly": "nightly-2026-11-19-f00125f",
+  "horizon_revision": "f037744a79f9982c47876f49c5a3067279f88706",
+  "horizon_nightly": "nightly-2026-11-21",
   "horizon_mixins_revision": "e59da9094f0c2fdda6c627fe9eff22dec6a906f0",
   "mods": [
     "mods/pingwheel/mixins/pingwheel",

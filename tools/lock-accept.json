@@ -1,0 +1,5 @@
+{
+  "note": "Version JSONs Mojang republished after the pinned Horizon commit, taken from Horizon's later research-lock.json. Added to the packaged lock so horizon-prepare accepts the copy a launcher downloads today.",
+  "accepted_manifest_sha1": ["ead839cbccf0ddf013c3f935f2840080b5cb0d26"],
+  "accepted_asset_index_sha1": ["f3df28b441565ca4e5deb9cda856d90df62e1433"]
+}

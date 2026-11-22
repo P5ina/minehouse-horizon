@@ -7,7 +7,7 @@ priority = 100
 # and the other players' positions inside the game's multiplayer code
 # (`game::remote`), which are not part of the stable hook points.
 [compatibility]
-horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
+horizon_revision = "f037744a79f9982c47876f49c5a3067279f88706"
 
 # Simple Voice Chat's protocol, Opus, the sound card and the voice threads.
 [[crate]]

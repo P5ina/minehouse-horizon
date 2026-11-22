@@ -6,7 +6,7 @@ priority = 100
 # Pinned: the printer sends its clicks inside the game's multiplayer code
 # (`game::remote`'s sequence and carried slot), not a stable hook point.
 [compatibility]
-horizon_revision = "f00125f61f794aaa3d4e950d301f353b35b6ee3d"
+horizon_revision = "f037744a79f9982c47876f49c5a3067279f88706"
 
 # .litematic files, placements, the commands and the printer's choices.
 [[crate]]
