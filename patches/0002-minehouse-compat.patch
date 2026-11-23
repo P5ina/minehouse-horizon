@@ -972,10 +972,34 @@ index 4926ea14e3..4e9dc0ab06 100644
  
  use mod_api::ModBlockEntity;
 diff --git a/crates/horizon-client/src/game/native_hooks/shared.rs b/crates/horizon-client/src/game/native_hooks/shared.rs
-index 8323b346fe..3f17b303dc 100644
+index 8323b346fe..c858eaf193 100644
 --- a/crates/horizon-client/src/game/native_hooks/shared.rs
 +++ b/crates/horizon-client/src/game/native_hooks/shared.rs
-@@ -1159,6 +1159,7 @@ impl Game<'_> {
+@@ -835,16 +835,14 @@ impl Game<'_> {
+     }
+     /// Whether a mod listens to one of the four screen render hooks; nothing
+     /// is built to fire them otherwise.
++    ///
++    /// MineHouse: always. Our mods draw their own screens (the voice chat's V
++    /// menu, the world map, the wardrobe, Fast Trading's button) from mixins on
++    /// `native_screen_render_post`, and a mixin subscribes to no hook, so with
++    /// this asking the hook list the hook never fired and a mod's screen stayed
++    /// an empty dark panel.
+     pub(super) fn screen_render_listened(&self) -> bool {
+-        use mod_api::HookId;
+-        [
+-            HookId::ScreenRenderPre,
+-            HookId::ScreenRenderBackground,
+-            HookId::ScreenRenderForeground,
+-            HookId::ScreenRenderPost,
+-        ]
+-        .into_iter()
+-        .any(mod_api::__private::listened)
++        true
+     }
+     /// `Render.Pre`: whether the screen draws. The screen owns its later phases.
+     pub(super) fn screen_render_begin(&self, draw: &mut HudBatch, screen: &ScreenView<'_>) -> bool {
+@@ -1159,6 +1157,7 @@ impl Game<'_> {
          &mut self,
          packet: &horizon_protocol::packets::play::Clientbound,
      ) {
@@ -983,7 +1007,7 @@ index 8323b346fe..3f17b303dc 100644
          if !mod_api::__private::listened(mod_api::HookId::ClientPacket) {
              return;
          }
-@@ -3282,6 +3283,7 @@ impl Game<'_> {
+@@ -3282,6 +3281,7 @@ impl Game<'_> {
              row.native = Some(NativePage { mappings, settings });
              self.settings.mods.installed.push(row);
          }
@@ -991,7 +1015,7 @@ index 8323b346fe..3f17b303dc 100644
      }
      /// The settings mod `mod_id` registered, with their kept values, as its page shows them.
      fn native_page_settings(&self, mod_id: &str) -> Vec<NativeSetting> {
-@@ -3323,6 +3325,9 @@ impl Game<'_> {
+@@ -3323,6 +3323,9 @@ impl Game<'_> {
      /// Setting `j` of native mod `i`'s page (its index in Options > Mods) changed on the page:
      /// kept as the mod registered it, then the mod is told (`setting_changed`).
      pub(super) fn native_setting_event(&mut self, i: usize, j: usize) {
@@ -1001,7 +1025,7 @@ index 8323b346fe..3f17b303dc 100644
          let Some(row) = self.settings.mods.installed.get(i) else {
              return;
          };
-@@ -3346,6 +3351,9 @@ impl Game<'_> {
+@@ -3346,6 +3349,9 @@ impl Game<'_> {
      }
      /// Native mod `i`'s page opened: its settings' kept values read again.
      pub(super) fn native_settings_refresh(&mut self, i: usize) {
